@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cd:*)",
+      "Bash(node -e:*)",
+      "Bash(npx tsc:*)",
+      "Bash(npx next lint:*)",
+      "Bash(npx next build:*)"
+    ]
+  }
+}

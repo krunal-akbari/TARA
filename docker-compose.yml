@@ -1,0 +1,95 @@
+services:
+  # Database - PostgreSQL
+  db:
+    image: postgres:16
+    container_name: tara-db
+    environment:
+      POSTGRES_DB: tara
+      POSTGRES_USER: tara
+      POSTGRES_PASSWORD: tara
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - tara-network
+    restart: unless-stopped
+
+  # Redis - Message broker and cache
+  redis:
+    image: redis:7
+    container_name: tara-redis
+    ports:
+      - "6379:6379"
+    networks:
+      - tara-network
+    restart: unless-stopped
+
+  # Backend API - FastAPI application
+  api:
+    build:
+      context: ./TARA - backend
+      dockerfile: Dockerfile
+    container_name: tara-api
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    env_file:
+      - ./TARA - backend/.env
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+      - redis
+    volumes:
+      - ./TARA - backend:/app
+    networks:
+      - tara-network
+    restart: unless-stopped
+
+  # Celery Worker - Background task processing
+  worker:
+    build:
+      context: ./TARA - backend
+      dockerfile: Dockerfile
+    container_name: tara-worker
+    command: celery -A app.tasks.celery_app.celery_app worker --loglevel=info --concurrency=4 -Q resume_ingest,routing_events,notifications
+    env_file:
+      - ./TARA - backend/.env
+    depends_on:
+      - db
+      - redis
+      - api
+    volumes:
+      - ./TARA - backend:/app
+    networks:
+      - tara-network
+    restart: unless-stopped
+
+  # Frontend - Next.js application
+  frontend:
+    build:
+      context: ./TARA - frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-/backend}
+        NEXT_PUBLIC_ENABLE_BOOTSTRAP_PAGE: ${NEXT_PUBLIC_ENABLE_BOOTSTRAP_PAGE:-false}
+        API_PROXY_TARGET: ${API_PROXY_TARGET:-http://api:8000}
+    container_name: tara-frontend
+    environment:
+      NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-/backend}
+      NEXT_PUBLIC_ENABLE_BOOTSTRAP_PAGE: ${NEXT_PUBLIC_ENABLE_BOOTSTRAP_PAGE:-false}
+      API_PROXY_TARGET: ${API_PROXY_TARGET:-http://api:8000}
+      NODE_ENV: production
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api
+    networks:
+      - tara-network
+    restart: unless-stopped
+
+networks:
+  tara-network:
+    driver: bridge
+
+volumes:
+  postgres_data:

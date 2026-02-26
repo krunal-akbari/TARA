@@ -1,0 +1,20 @@
+services:
+  frontend:
+    container_name: tara-frontend
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-/backend}
+        NEXT_PUBLIC_ENABLE_BOOTSTRAP_PAGE: ${NEXT_PUBLIC_ENABLE_BOOTSTRAP_PAGE:-false}
+        API_PROXY_TARGET: ${API_PROXY_TARGET:-http://host.docker.internal:8000}
+    environment:
+      NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-/backend}
+      NEXT_PUBLIC_ENABLE_BOOTSTRAP_PAGE: ${NEXT_PUBLIC_ENABLE_BOOTSTRAP_PAGE:-false}
+      API_PROXY_TARGET: ${API_PROXY_TARGET:-http://host.docker.internal:8000}
+      NODE_ENV: production
+    ports:
+      - "3000:3000"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
