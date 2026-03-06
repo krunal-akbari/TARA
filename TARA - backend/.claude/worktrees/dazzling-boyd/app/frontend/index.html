@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TARA - Super Admin</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:#f0f2f5;color:#1a1a2e;min-height:100vh}
+/* ── Login ── */
+.login-wrapper{display:flex;align-items:center;justify-content:center;min-height:100vh}
+.login-card{background:#fff;padding:2.5rem;border-radius:12px;box-shadow:0 4px 24px rgba(0,0,0,.08);width:100%;max-width:400px}
+.login-card h1{font-size:1.5rem;margin-bottom:.25rem;color:#16213e}
+.login-card p.sub{color:#888;font-size:.875rem;margin-bottom:1.5rem}
+/* ── Dashboard ── */
+.dash{display:none}
+.topbar{background:#16213e;color:#fff;padding:.75rem 1.5rem;display:flex;align-items:center;justify-content:space-between}
+.topbar h1{font-size:1.125rem;font-weight:600}
+.topbar .user-info{display:flex;align-items:center;gap:.75rem;font-size:.875rem}
+.topbar button{background:#e94560;border:none;color:#fff;padding:.4rem 1rem;border-radius:6px;cursor:pointer;font-size:.8rem}
+.container{max-width:1100px;margin:0 auto;padding:1.5rem}
+.tabs{display:flex;gap:.5rem;margin-bottom:1.5rem;flex-wrap:wrap}
+.tabs button{background:#dfe6e9;border:none;padding:.5rem 1.25rem;border-radius:6px;cursor:pointer;font-weight:500;font-size:.875rem}
+.tabs button.active{background:#16213e;color:#fff}
+.panel{display:none}
+.panel.active{display:block}
+.card{background:#fff;border-radius:10px;box-shadow:0 2px 12px rgba(0,0,0,.06);padding:1.5rem;margin-bottom:1.25rem}
+.card h2{font-size:1.125rem;margin-bottom:1rem;color:#16213e}
+/* ── Stat Cards ── */
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:1rem;margin-bottom:1.5rem}
+.stat-card{background:#fff;border-radius:10px;box-shadow:0 2px 12px rgba(0,0,0,.06);padding:1.25rem;text-align:center}
+.stat-card .stat-value{font-size:2rem;font-weight:700;color:#16213e}
+.stat-card .stat-label{font-size:.8rem;color:#888;margin-top:.25rem}
+.stat-card.highlight{background:linear-gradient(135deg,#0984e3,#74b9ff);color:#fff}
+.stat-card.highlight .stat-value{color:#fff}
+.stat-card.highlight .stat-label{color:rgba(255,255,255,.85)}
+/* ── Forms ── */
+label{display:block;font-size:.8rem;font-weight:600;margin-bottom:.25rem;color:#333}
+input,select{width:100%;padding:.55rem .75rem;border:1px solid #d1d5db;border-radius:6px;font-size:.875rem;margin-bottom:.75rem;outline:none;transition:border .15s}
+input:focus{border-color:#0984e3}
+.btn{display:inline-block;padding:.55rem 1.25rem;border:none;border-radius:6px;font-size:.875rem;font-weight:600;cursor:pointer;transition:opacity .15s}
+.btn:hover{opacity:.88}
+.btn-primary{background:#0984e3;color:#fff}
+.btn-danger{background:#e94560;color:#fff}
+.btn-sm{padding:.35rem .75rem;font-size:.8rem}
+.btn-outline{background:transparent;border:1px solid #d1d5db;color:#333}
+.btn-outline:hover{background:#f8f9fa}
+/* ── Table ── */
+table{width:100%;border-collapse:collapse;font-size:.85rem}
+th{text-align:left;padding:.6rem .75rem;background:#f8f9fa;border-bottom:2px solid #dee2e6;font-weight:600;color:#555}
+td{padding:.55rem .75rem;border-bottom:1px solid #eee}
+tr:hover td{background:#f8f9fa}
+.badge{display:inline-block;padding:.15rem .5rem;border-radius:4px;font-size:.75rem;font-weight:600}
+.badge-active{background:#d4edda;color:#155724}
+.badge-inactive{background:#f8d7da;color:#721c24}
+/* ── Activity Feed ── */
+.activity-list{list-style:none;padding:0}
+.activity-item{display:flex;gap:1rem;padding:.85rem 0;border-bottom:1px solid #f0f0f0;align-items:flex-start}
+.activity-item:last-child{border-bottom:none}
+.activity-icon{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.9rem;flex-shrink:0;color:#fff;font-weight:700}
+.activity-icon.login{background:#00b894}
+.activity-icon.create{background:#0984e3}
+.activity-icon.update{background:#fdcb6e;color:#333}
+.activity-icon.deactivate{background:#e94560}
+.activity-icon.seed{background:#6c5ce7}
+.activity-body{flex:1;min-width:0}
+.activity-body .actor{font-weight:600;color:#16213e}
+.activity-body .desc{font-size:.85rem;color:#555;margin-top:.15rem}
+.activity-body .ts{font-size:.75rem;color:#aaa;margin-top:.25rem}
+.activity-detail{font-size:.78rem;color:#777;margin-top:.25rem;background:#f8f9fa;padding:.35rem .6rem;border-radius:4px;display:inline-block;max-width:100%;word-break:break-all}
+.activity-controls{display:flex;align-items:center;gap:1rem;margin-bottom:1rem}
+.activity-controls .auto-label{font-size:.8rem;color:#888}
+.pagination{display:flex;align-items:center;gap:.5rem;margin-top:1rem;justify-content:center}
+.pagination button{padding:.3rem .7rem;border:1px solid #d1d5db;background:#fff;border-radius:4px;cursor:pointer;font-size:.8rem}
+.pagination button:disabled{opacity:.4;cursor:default}
+.pagination span{font-size:.8rem;color:#888}
+/* ── Toast ── */
+.toast{position:fixed;top:1rem;right:1rem;padding:.75rem 1.25rem;border-radius:8px;color:#fff;font-size:.875rem;z-index:999;opacity:0;transition:opacity .3s}
+.toast.show{opacity:1}
+.toast-ok{background:#00b894}
+.toast-err{background:#e94560}
+/* ── Row layout ── */
+.row{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
+@media(max-width:768px){.row{grid-template-columns:1fr}.stats-grid{grid-template-columns:repeat(2,1fr)}}
+</style>
+</head>
+<body>
+
+<!-- ============ LOGIN SCREEN ============ -->
+<div id="loginScreen" class="login-wrapper">
+  <div class="login-card">
+    <h1>TARA Super Admin</h1>
+    <p class="sub">Sign in to manage tenants</p>
+    <form id="loginForm">
+      <label for="loginEmail">Email</label>
+      <input id="loginEmail" type="email" required placeholder="superadmin@tara-ats.com">
+      <label for="loginPass">Password</label>
+      <input id="loginPass" type="password" required placeholder="Password" minlength="8">
+      <button type="submit" class="btn btn-primary" style="width:100%;margin-top:.5rem">Sign In</button>
+    </form>
+    <p id="loginError" style="color:#e94560;font-size:.8rem;margin-top:.75rem;display:none"></p>
+  </div>
+</div>
+
+<!-- ============ DASHBOARD ============ -->
+<div id="dashboard" class="dash">
+  <div class="topbar">
+    <h1>TARA Super Admin</h1>
+    <div class="user-info">
+      <span id="currentEmail"></span>
+      <button onclick="logout()">Logout</button>
+    </div>
+  </div>
+
+  <div class="container">
+    <div class="tabs">
+      <button class="active" onclick="switchTab('overview',this)">Dashboard</button>
+      <button onclick="switchTab('activity',this)">Activity Log</button>
+      <button onclick="switchTab('tenants',this)">Tenants</button>
+      <button onclick="switchTab('admins',this)">Super Admins</button>
+    </div>
+
+    <!-- ── Overview Panel ── -->
+    <div id="panel-overview" class="panel active">
+      <div class="stats-grid" id="statsGrid">
+        <div class="stat-card highlight"><div class="stat-value" id="statTenantsTotal">-</div><div class="stat-label">Total Tenants</div></div>
+        <div class="stat-card"><div class="stat-value" id="statTenantsActive">-</div><div class="stat-label">Active Tenants</div></div>
+        <div class="stat-card"><div class="stat-value" id="statTenantsInactive">-</div><div class="stat-label">Inactive Tenants</div></div>
+        <div class="stat-card"><div class="stat-value" id="statAdmins">-</div><div class="stat-label">Super Admins</div></div>
+        <div class="stat-card"><div class="stat-value" id="statUsers">-</div><div class="stat-label">Tenant Users</div></div>
+        <div class="stat-card"><div class="stat-value" id="statEvents">-</div><div class="stat-label">Total Events</div></div>
+      </div>
+      <div class="card">
+        <h2>Recent Tenants</h2>
+        <table>
+          <thead><tr><th>ID</th><th>Name</th><th>Status</th></tr></thead>
+          <tbody id="recentTenantRows"><tr><td colspan="3">Loading...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ── Activity Panel ── -->
+    <div id="panel-activity" class="panel">
+      <div class="card">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem">
+          <h2 style="margin-bottom:0">Activity Log</h2>
+          <div class="activity-controls" style="margin-bottom:0">
+            <label style="display:flex;align-items:center;gap:.4rem;margin-bottom:0;cursor:pointer">
+              <input type="checkbox" id="autoRefresh" checked>
+              <span class="auto-label">Auto-refresh (30s)</span>
+            </label>
+            <button class="btn btn-outline btn-sm" onclick="loadActivity()">Refresh</button>
+          </div>
+        </div>
+        <ul class="activity-list" id="activityList">
+          <li style="padding:1rem;color:#888">Loading activity...</li>
+        </ul>
+        <div class="pagination" id="activityPagination"></div>
+      </div>
+    </div>
+
+    <!-- ── Tenants Panel ── -->
+    <div id="panel-tenants" class="panel">
+      <div class="row">
+        <div class="card">
+          <h2>Create Tenant</h2>
+          <form id="createTenantForm">
+            <label>Tenant Name</label>
+            <input id="tName" required minlength="2" maxlength="255">
+            <label>Admin Email</label>
+            <input id="tEmail" type="email" required>
+            <label>Admin Password</label>
+            <input id="tPass" type="password" required minlength="8" maxlength="128">
+            <div class="row">
+              <div><label>Currency</label><input id="tCurrency" value="USD" maxlength="8"></div>
+              <div><label>Timezone</label><input id="tTimezone" value="UTC"></div>
+            </div>
+            <button type="submit" class="btn btn-primary">Create Tenant</button>
+          </form>
+        </div>
+        <div class="card">
+          <h2>Tenants</h2>
+          <table>
+            <thead><tr><th>ID</th><th>Name</th><th>Status</th><th>Currency</th><th>Action</th></tr></thead>
+            <tbody id="tenantRows"><tr><td colspan="5">Loading...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Admins Panel ── -->
+    <div id="panel-admins" class="panel">
+      <div class="row">
+        <div class="card">
+          <h2>Add Super Admin</h2>
+          <form id="createAdminForm">
+            <label>Email</label>
+            <input id="aEmail" type="email" required>
+            <label>Password</label>
+            <input id="aPass" type="password" required minlength="8" maxlength="128">
+            <button type="submit" class="btn btn-primary">Create Super Admin</button>
+          </form>
+        </div>
+        <div class="card">
+          <h2>Super Admins</h2>
+          <table>
+            <thead><tr><th>ID</th><th>Email</th><th>Status</th></tr></thead>
+            <tbody id="adminRows"><tr><td colspan="3">Loading...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Toast ── -->
+<div id="toast" class="toast"></div>
+
+<script>
+const API = '/api/v1/super-admin';
+let token = sessionStorage.getItem('sa_token') || '';
+let currentEmail = sessionStorage.getItem('sa_email') || '';
+let activityPage = 1;
+let activityTotal = 0;
+const PAGE_SIZE = 20;
+let autoRefreshTimer = null;
+
+/* ── Helpers ── */
+function headers(){ return {'Content-Type':'application/json','Authorization':'Bearer '+token}; }
+
+function toast(msg, ok){
+  const t=document.getElementById('toast');
+  t.textContent=msg;
+  t.className='toast show '+(ok?'toast-ok':'toast-err');
+  setTimeout(()=>t.className='toast',3000);
+}
+
+async function api(method, path, body){
+  const opts = {method, headers: headers()};
+  if(body) opts.body = JSON.stringify(body);
+  const res = await fetch(API+path, opts);
+  const data = res.headers.get('content-type')?.includes('json') ? await res.json() : null;
+  if(!res.ok) throw new Error(data?.detail || res.statusText);
+  return data;
+}
+
+function esc(s){ const d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
+
+function fmtDate(iso){
+  const d = new Date(iso);
+  const now = new Date();
+  const diff = Math.floor((now - d) / 1000);
+  if(diff < 60) return 'just now';
+  if(diff < 3600) return Math.floor(diff/60) + 'm ago';
+  if(diff < 86400) return Math.floor(diff/3600) + 'h ago';
+  return d.toLocaleDateString(undefined, {month:'short',day:'numeric',year:'numeric'}) + ' ' +
+         d.toLocaleTimeString(undefined, {hour:'2-digit',minute:'2-digit'});
+}
+
+function actionIcon(action){
+  const map = {login:'login',create:'create',update:'update',deactivate:'deactivate',seed:'seed'};
+  return map[action] || 'create';
+}
+
+function actionLabel(action){
+  const map = {login:'L',create:'+',update:'E',deactivate:'X',seed:'S'};
+  return map[action] || '?';
+}
+
+function actionText(ev){
+  const a = ev.action;
+  const t = ev.target_type;
+  const label = ev.target_label ? esc(ev.target_label) : '';
+  if(a==='login') return 'logged in';
+  if(a==='seed') return 'seeded initial account <strong>'+label+'</strong>';
+  if(a==='create' && t==='tenant') return 'created tenant <strong>'+label+'</strong>';
+  if(a==='create' && t==='super_admin') return 'created super admin <strong>'+label+'</strong>';
+  if(a==='update' && t==='tenant') return 'updated tenant <strong>'+label+'</strong>';
+  if(a==='deactivate' && t==='tenant') return 'deactivated tenant <strong>'+label+'</strong>';
+  return a+' '+t+' '+label;
+}
+
+/* ── Auth ── */
+if(token) showDashboard();
+
+document.getElementById('loginForm').onsubmit = async e => {
+  e.preventDefault();
+  const email = document.getElementById('loginEmail').value;
+  const password = document.getElementById('loginPass').value;
+  const errEl = document.getElementById('loginError');
+  errEl.style.display='none';
+  try {
+    const data = await (await fetch(API+'/login',{
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({email, password})
+    })).json();
+    if(!data.access_token){ errEl.textContent=data.detail||'Login failed'; errEl.style.display='block'; return; }
+    token = data.access_token;
+    currentEmail = email;
+    sessionStorage.setItem('sa_token', token);
+    sessionStorage.setItem('sa_email', email);
+    showDashboard();
+  } catch(err){ errEl.textContent='Network error'; errEl.style.display='block'; }
+};
+
+function showDashboard(){
+  document.getElementById('loginScreen').style.display='none';
+  document.getElementById('dashboard').style.display='block';
+  document.getElementById('currentEmail').textContent=currentEmail;
+  loadDashboard();
+  loadActivity();
+  loadTenants();
+  loadAdmins();
+  startAutoRefresh();
+}
+
+function logout(){
+  token=''; currentEmail='';
+  sessionStorage.removeItem('sa_token');
+  sessionStorage.removeItem('sa_email');
+  document.getElementById('dashboard').style.display='none';
+  document.getElementById('loginScreen').style.display='flex';
+  stopAutoRefresh();
+}
+
+/* ── Tabs ── */
+function switchTab(name, btn){
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tabs button').forEach(b=>b.classList.remove('active'));
+  document.getElementById('panel-'+name).classList.add('active');
+  btn.classList.add('active');
+}
+
+/* ── Dashboard Overview ── */
+async function loadDashboard(){
+  try {
+    const data = await api('GET','/dashboard');
+    document.getElementById('statTenantsTotal').textContent = data.tenants_total;
+    document.getElementById('statTenantsActive').textContent = data.tenants_active;
+    document.getElementById('statTenantsInactive').textContent = data.tenants_inactive;
+    document.getElementById('statAdmins').textContent = data.admins_total;
+    document.getElementById('statUsers').textContent = data.users_total;
+    document.getElementById('statEvents').textContent = data.events_total;
+    const rows = data.recent_tenants.map(t => `<tr>
+      <td>${t.id}</td><td>${esc(t.name)}</td>
+      <td><span class="badge ${t.status==='active'?'badge-active':'badge-inactive'}">${t.status}</span></td>
+    </tr>`).join('');
+    document.getElementById('recentTenantRows').innerHTML = rows || '<tr><td colspan="3">No tenants yet</td></tr>';
+  } catch(err){
+    document.getElementById('recentTenantRows').innerHTML='<tr><td colspan="3">Error loading dashboard</td></tr>';
+  }
+}
+
+/* ── Activity Log ── */
+async function loadActivity(){
+  try {
+    const data = await api('GET','/activity?page='+activityPage+'&page_size='+PAGE_SIZE);
+    activityTotal = data.total;
+    const list = document.getElementById('activityList');
+    if(!data.items.length){
+      list.innerHTML = '<li style="padding:1rem;color:#888">No activity recorded yet.</li>';
+    } else {
+      list.innerHTML = data.items.map(ev => {
+        const detailHtml = ev.detail && Object.keys(ev.detail).length
+          ? '<div class="activity-detail">'+esc(JSON.stringify(ev.detail))+'</div>'
+          : '';
+        return `<li class="activity-item">
+          <div class="activity-icon ${actionIcon(ev.action)}">${actionLabel(ev.action)}</div>
+          <div class="activity-body">
+            <div><span class="actor">${esc(ev.actor_email)}</span></div>
+            <div class="desc">${actionText(ev)}</div>
+            ${detailHtml}
+            <div class="ts">${fmtDate(ev.created_at)}</div>
+          </div>
+        </li>`;
+      }).join('');
+    }
+    renderPagination();
+  } catch(err){
+    document.getElementById('activityList').innerHTML='<li style="padding:1rem;color:#e94560">Error loading activity.</li>';
+  }
+}
+
+function renderPagination(){
+  const totalPages = Math.max(1, Math.ceil(activityTotal / PAGE_SIZE));
+  const pg = document.getElementById('activityPagination');
+  if(totalPages <= 1){ pg.innerHTML=''; return; }
+  pg.innerHTML = `
+    <button onclick="goActivityPage(${activityPage-1})" ${activityPage<=1?'disabled':''}>Prev</button>
+    <span>Page ${activityPage} of ${totalPages}</span>
+    <button onclick="goActivityPage(${activityPage+1})" ${activityPage>=totalPages?'disabled':''}>Next</button>
+  `;
+}
+
+function goActivityPage(p){
+  activityPage = p;
+  loadActivity();
+}
+
+/* ── Auto Refresh ── */
+function startAutoRefresh(){
+  stopAutoRefresh();
+  autoRefreshTimer = setInterval(()=>{
+    if(document.getElementById('autoRefresh').checked){
+      loadDashboard();
+      loadActivity();
+    }
+  }, 30000);
+}
+
+function stopAutoRefresh(){
+  if(autoRefreshTimer){ clearInterval(autoRefreshTimer); autoRefreshTimer=null; }
+}
+
+/* ── Tenants ── */
+async function loadTenants(){
+  try {
+    const data = await api('GET','/tenants');
+    const rows = data.items.map(t=>`<tr>
+      <td>${t.id}</td><td>${esc(t.name)}</td>
+      <td><span class="badge ${t.status==='active'?'badge-active':'badge-inactive'}">${t.status}</span></td>
+      <td>${esc(t.currency_code)}</td>
+      <td>${t.status==='active'?`<button class="btn btn-danger btn-sm" onclick="deactivateTenant(${t.id})">Deactivate</button>`:'-'}</td>
+    </tr>`).join('');
+    document.getElementById('tenantRows').innerHTML = rows || '<tr><td colspan="5">No tenants yet</td></tr>';
+  } catch(err){ document.getElementById('tenantRows').innerHTML='<tr><td colspan="5">Error loading</td></tr>'; }
+}
+
+document.getElementById('createTenantForm').onsubmit = async e => {
+  e.preventDefault();
+  try {
+    await api('POST','/tenants',{
+      tenant_name: document.getElementById('tName').value,
+      admin_email: document.getElementById('tEmail').value,
+      admin_password: document.getElementById('tPass').value,
+      currency_code: document.getElementById('tCurrency').value || 'USD',
+      timezone: document.getElementById('tTimezone').value || 'UTC',
+    });
+    toast('Tenant created', true);
+    e.target.reset(); document.getElementById('tCurrency').value='USD'; document.getElementById('tTimezone').value='UTC';
+    loadTenants(); loadDashboard(); loadActivity();
+  } catch(err){ toast(err.message, false); }
+};
+
+async function deactivateTenant(id){
+  if(!confirm('Deactivate this tenant?')) return;
+  try { await api('POST','/tenants/'+id+'/deactivate'); toast('Tenant deactivated',true); loadTenants(); loadDashboard(); loadActivity(); }
+  catch(err){ toast(err.message, false); }
+}
+
+/* ── Admins ── */
+async function loadAdmins(){
+  try {
+    const data = await api('GET','/admins');
+    const rows = data.map(a=>`<tr>
+      <td>${a.id}</td><td>${esc(a.email)}</td>
+      <td><span class="badge ${a.is_active?'badge-active':'badge-inactive'}">${a.is_active?'active':'inactive'}</span></td>
+    </tr>`).join('');
+    document.getElementById('adminRows').innerHTML = rows || '<tr><td colspan="3">None</td></tr>';
+  } catch(err){ document.getElementById('adminRows').innerHTML='<tr><td colspan="3">Error loading</td></tr>'; }
+}
+
+document.getElementById('createAdminForm').onsubmit = async e => {
+  e.preventDefault();
+  try {
+    await api('POST','/admins',{
+      email: document.getElementById('aEmail').value,
+      password: document.getElementById('aPass').value,
+    });
+    toast('Super Admin created', true);
+    e.target.reset(); loadAdmins(); loadDashboard(); loadActivity();
+  } catch(err){ toast(err.message, false); }
+};
+</script>
+</body>
+</html>

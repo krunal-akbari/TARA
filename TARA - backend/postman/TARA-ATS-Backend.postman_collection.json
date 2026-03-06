@@ -1,0 +1,480 @@
+{
+  "info": {
+    "name": "TARA ATS Backend",
+    "description": "Module-wise API collection for TARA ATS backend.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Live",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/health/live"
+          }
+        },
+        {
+          "name": "Ready",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/health/ready"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Tenancy",
+      "item": [
+        {
+          "name": "Bootstrap Tenant",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "  const data = pm.response.json();",
+                  "  pm.environment.set('tenant_id', data.tenant_id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Bootstrap-Key", "value": "{{bootstrap_key}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tenant_name\": \"{{tenant_name}}\",\n  \"admin_email\": \"{{admin_email}}\",\n  \"admin_password\": \"{{admin_password}}\",\n  \"currency_code\": \"USD\",\n  \"timezone\": \"UTC\",\n  \"resume_retention_days\": 365,\n  \"audit_retention_days\": 730\n}"
+            },
+            "url": "{{base_url}}/api/v1/admin/tenants/bootstrap"
+          }
+        },
+        {
+          "name": "Public Onboarding",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "  const data = pm.response.json();",
+                  "  pm.environment.set('tenant_id', data.tenant_id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Onboarding-Key", "value": "{{onboarding_key}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tenant_name\": \"{{tenant_name}}\",\n  \"admin_email\": \"{{admin_email}}\",\n  \"admin_password\": \"{{admin_password}}\",\n  \"currency_code\": \"USD\",\n  \"timezone\": \"UTC\",\n  \"resume_retention_days\": 365,\n  \"audit_retention_days\": 730\n}"
+            },
+            "url": "{{base_url}}/api/v1/public/onboarding"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "  const data = pm.response.json();",
+                  "  pm.environment.set('access_token', data.access_token);",
+                  "  pm.environment.set('refresh_token', data.refresh_token);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{admin_email}}\",\n  \"password\": \"{{admin_password}}\"\n}"
+            },
+            "url": "{{base_url}}/api/v1/auth/login"
+          }
+        },
+        {
+          "name": "Refresh",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "  const data = pm.response.json();",
+                  "  pm.environment.set('access_token', data.access_token);",
+                  "  pm.environment.set('refresh_token', data.refresh_token);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refresh_token\": \"{{refresh_token}}\"\n}"
+            },
+            "url": "{{base_url}}/api/v1/auth/refresh"
+          }
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refresh_token\": \"{{refresh_token}}\"\n}"
+            },
+            "url": "{{base_url}}/api/v1/auth/logout"
+          }
+        },
+        {
+          "name": "Me",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "X-Tenant-Id", "value": "{{tenant_id}}" }
+            ],
+            "url": "{{base_url}}/api/v1/auth/me"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Clients",
+      "item": [
+        {
+          "name": "Create Client",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "  const data = pm.response.json();",
+                  "  pm.environment.set('client_id', data.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "X-Tenant-Id", "value": "{{tenant_id}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Client A\",\n  \"status\": \"active\"\n}" },
+            "url": "{{base_url}}/api/v1/clients"
+          }
+        },
+        { "name": "List Clients", "request": { "method": "GET", "header": [ { "key": "Authorization", "value": "Bearer {{access_token}}" }, { "key": "X-Tenant-Id", "value": "{{tenant_id}}" } ], "url": "{{base_url}}/api/v1/clients?include_deleted=false&page=1&page_size=20" } },
+        { "name": "Get Client", "request": { "method": "GET", "header": [ { "key": "Authorization", "value": "Bearer {{access_token}}" }, { "key": "X-Tenant-Id", "value": "{{tenant_id}}" } ], "url": "{{base_url}}/api/v1/clients/{{client_id}}" } },
+        { "name": "Update Client", "request": { "method": "PATCH", "header": [ { "key": "Authorization", "value": "Bearer {{access_token}}" }, { "key": "X-Tenant-Id", "value": "{{tenant_id}}" }, { "key": "Content-Type", "value": "application/json" } ], "body": { "mode": "raw", "raw": "{\n  \"name\": \"Client A Updated\"\n}" }, "url": "{{base_url}}/api/v1/clients/{{client_id}}" } },
+        { "name": "Delete Client", "request": { "method": "DELETE", "header": [ { "key": "Authorization", "value": "Bearer {{access_token}}" }, { "key": "X-Tenant-Id", "value": "{{tenant_id}}" } ], "url": "{{base_url}}/api/v1/clients/{{client_id}}" } },
+        { "name": "Restore Client", "request": { "method": "POST", "header": [ { "key": "Authorization", "value": "Bearer {{access_token}}" }, { "key": "X-Tenant-Id", "value": "{{tenant_id}}" } ], "url": "{{base_url}}/api/v1/clients/{{client_id}}/restore" } }
+      ]
+    },
+    {
+      "name": "Vendors",
+      "item": [
+        {
+          "name": "Create Vendor",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "  const data = pm.response.json();",
+                  "  pm.environment.set('vendor_id', data.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "X-Tenant-Id", "value": "{{tenant_id}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Vendor X\",\n  \"status\": \"active\",\n  \"client_id\": {{client_id}}\n}" },
+            "url": "{{base_url}}/api/v1/vendors"
+          }
+        },
+        { "name": "List Vendors", "request": { "method": "GET", "header": [ { "key": "Authorization", "value": "Bearer {{access_token}}" }, { "key": "X-Tenant-Id", "value": "{{tenant_id}}" } ], "url": "{{base_url}}/api/v1/vendors?include_deleted=false&page=1&page_size=20" } },
+        { "name": "Get Vendor", "request": { "method": "GET", "header": [ { "key": "Authorization", "value": "Bearer {{access_token}}" }, { "key": "X-Tenant-Id", "value": "{{tenant_id}}" } ], "url": "{{base_url}}/api/v1/vendors/{{vendor_id}}" } },
+        { "name": "Update Vendor", "request": { "method": "PATCH", "header": [ { "key": "Authorization", "value": "Bearer {{access_token}}" }, { "key": "X-Tenant-Id", "value": "{{tenant_id}}" }, { "key": "Content-Type", "value": "application/json" } ], "body": { "mode": "raw", "raw": "{\n  \"name\": \"Vendor X Updated\"\n}" }, "url": "{{base_url}}/api/v1/vendors/{{vendor_id}}" } },
+        { "name": "Delete Vendor", "request": { "method": "DELETE", "header": [ { "key": "Authorization", "value": "Bearer {{access_token}}" }, { "key": "X-Tenant-Id", "value": "{{tenant_id}}" } ], "url": "{{base_url}}/api/v1/vendors/{{vendor_id}}" } },
+        { "name": "Restore Vendor", "request": { "method": "POST", "header": [ { "key": "Authorization", "value": "Bearer {{access_token}}" }, { "key": "X-Tenant-Id", "value": "{{tenant_id}}" } ], "url": "{{base_url}}/api/v1/vendors/{{vendor_id}}/restore" } }
+      ]
+    },
+    {
+      "name": "ClientVendorLinks",
+      "item": [
+        {
+          "name": "Create Link",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "  const data = pm.response.json();",
+                  "  pm.environment.set('link_id', data.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "X-Tenant-Id", "value": "{{tenant_id}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"client_id\": {{client_id}},\n  \"vendor_id\": {{vendor_id}},\n  \"status\": \"active\",\n  \"priority\": 100,\n  \"effective_from\": null,\n  \"effective_to\": null\n}"
+            },
+            "url": "{{base_url}}/api/v1/client-vendor-links"
+          }
+        },
+        { "name": "List Links", "request": { "method": "GET", "header": [ { "key": "Authorization", "value": "Bearer {{access_token}}" }, { "key": "X-Tenant-Id", "value": "{{tenant_id}}" } ], "url": "{{base_url}}/api/v1/client-vendor-links?include_deleted=false&page=1&page_size=20" } },
+        { "name": "Update Link", "request": { "method": "PATCH", "header": [ { "key": "Authorization", "value": "Bearer {{access_token}}" }, { "key": "X-Tenant-Id", "value": "{{tenant_id}}" }, { "key": "Content-Type", "value": "application/json" } ], "body": { "mode": "raw", "raw": "{\n  \"status\": \"inactive\",\n  \"priority\": 10\n}" }, "url": "{{base_url}}/api/v1/client-vendor-links/{{link_id}}" } },
+        { "name": "Delete Link", "request": { "method": "DELETE", "header": [ { "key": "Authorization", "value": "Bearer {{access_token}}" }, { "key": "X-Tenant-Id", "value": "{{tenant_id}}" } ], "url": "{{base_url}}/api/v1/client-vendor-links/{{link_id}}" } },
+        { "name": "Restore Link", "request": { "method": "POST", "header": [ { "key": "Authorization", "value": "Bearer {{access_token}}" }, { "key": "X-Tenant-Id", "value": "{{tenant_id}}" } ], "url": "{{base_url}}/api/v1/client-vendor-links/{{link_id}}/restore" } }
+      ]
+    },
+    {
+      "name": "Jobs",
+      "item": [
+        {
+          "name": "Create Job",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "  const data = pm.response.json();",
+                  "  pm.environment.set('job_id', data.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "X-Tenant-Id", "value": "{{tenant_id}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Python Developer\",\n  \"description\": \"Backend role\",\n  \"status\": \"open\",\n  \"intake_channel\": \"direct_client\",\n  \"origin_client_id\": null,\n  \"origin_vendor_id\": null\n}"
+            },
+            "url": "{{base_url}}/api/v1/jobs"
+          }
+        },
+        { "name": "List Jobs", "request": { "method": "GET", "header": [ { "key": "Authorization", "value": "Bearer {{access_token}}" }, { "key": "X-Tenant-Id", "value": "{{tenant_id}}" } ], "url": "{{base_url}}/api/v1/jobs?include_deleted=false&page=1&page_size=20" } },
+        { "name": "Get Job", "request": { "method": "GET", "header": [ { "key": "Authorization", "value": "Bearer {{access_token}}" }, { "key": "X-Tenant-Id", "value": "{{tenant_id}}" } ], "url": "{{base_url}}/api/v1/jobs/{{job_id}}" } },
+        { "name": "Update Job", "request": { "method": "PATCH", "header": [ { "key": "Authorization", "value": "Bearer {{access_token}}" }, { "key": "X-Tenant-Id", "value": "{{tenant_id}}" }, { "key": "Content-Type", "value": "application/json" } ], "body": { "mode": "raw", "raw": "{\n  \"title\": \"Python Developer Updated\",\n  \"intake_channel\": \"preferred_vendor\"\n}" }, "url": "{{base_url}}/api/v1/jobs/{{job_id}}" } },
+        { "name": "Delete Job", "request": { "method": "DELETE", "header": [ { "key": "Authorization", "value": "Bearer {{access_token}}" }, { "key": "X-Tenant-Id", "value": "{{tenant_id}}" } ], "url": "{{base_url}}/api/v1/jobs/{{job_id}}" } },
+        { "name": "Restore Job", "request": { "method": "POST", "header": [ { "key": "Authorization", "value": "Bearer {{access_token}}" }, { "key": "X-Tenant-Id", "value": "{{tenant_id}}" } ], "url": "{{base_url}}/api/v1/jobs/{{job_id}}/restore" } }
+      ]
+    },
+    {
+      "name": "Routing",
+      "item": [
+        {
+          "name": "Create Route Transition",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "  const data = pm.response.json();",
+                  "  pm.environment.set('route_transition_id', data.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "X-Tenant-Id", "value": "{{tenant_id}}" },
+              { "key": "Idempotency-Key", "value": "route-{{$timestamp}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"to_node_type\": \"client\",\n  \"to_node_id\": {{client_id}},\n  \"reason\": \"submitted\",\n  \"notes\": \"initial handoff\"\n}"
+            },
+            "url": "{{base_url}}/api/v1/jobs/{{job_id}}/route-transitions"
+          }
+        },
+        { "name": "List Route Transitions", "request": { "method": "GET", "header": [ { "key": "Authorization", "value": "Bearer {{access_token}}" }, { "key": "X-Tenant-Id", "value": "{{tenant_id}}" } ], "url": "{{base_url}}/api/v1/jobs/{{job_id}}/route-transitions?page=1&page_size=20" } },
+        { "name": "Current Route", "request": { "method": "GET", "header": [ { "key": "Authorization", "value": "Bearer {{access_token}}" }, { "key": "X-Tenant-Id", "value": "{{tenant_id}}" } ], "url": "{{base_url}}/api/v1/jobs/{{job_id}}/current-route" } }
+      ]
+    },
+    {
+      "name": "Candidates",
+      "item": [
+        {
+          "name": "Create Candidate",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "  const data = pm.response.json();",
+                  "  pm.environment.set('candidate_id', data.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "X-Tenant-Id", "value": "{{tenant_id}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"first_name\": \"John\",\n  \"last_name\": \"Doe\",\n  \"email\": \"john@example.com\",\n  \"phone\": \"+1-555-100-2000\",\n  \"current_company\": \"ABC Corp\"\n}"
+            },
+            "url": "{{base_url}}/api/v1/candidates"
+          }
+        },
+        { "name": "List Candidates", "request": { "method": "GET", "header": [ { "key": "Authorization", "value": "Bearer {{access_token}}" }, { "key": "X-Tenant-Id", "value": "{{tenant_id}}" } ], "url": "{{base_url}}/api/v1/candidates?include_deleted=false&page=1&page_size=20" } },
+        { "name": "Get Candidate", "request": { "method": "GET", "header": [ { "key": "Authorization", "value": "Bearer {{access_token}}" }, { "key": "X-Tenant-Id", "value": "{{tenant_id}}" } ], "url": "{{base_url}}/api/v1/candidates/{{candidate_id}}" } },
+        { "name": "Update Candidate", "request": { "method": "PATCH", "header": [ { "key": "Authorization", "value": "Bearer {{access_token}}" }, { "key": "X-Tenant-Id", "value": "{{tenant_id}}" }, { "key": "Content-Type", "value": "application/json" } ], "body": { "mode": "raw", "raw": "{\n  \"first_name\": \"Johnny\",\n  \"phone\": \"5551002000\"\n}" }, "url": "{{base_url}}/api/v1/candidates/{{candidate_id}}" } },
+        { "name": "Dedupe Check", "request": { "method": "GET", "header": [ { "key": "Authorization", "value": "Bearer {{access_token}}" }, { "key": "X-Tenant-Id", "value": "{{tenant_id}}" } ], "url": "{{base_url}}/api/v1/candidates/{{candidate_id}}/dedupe-check?email=john@example.com&phone=5551002000" } },
+        { "name": "Delete Candidate", "request": { "method": "DELETE", "header": [ { "key": "Authorization", "value": "Bearer {{access_token}}" }, { "key": "X-Tenant-Id", "value": "{{tenant_id}}" } ], "url": "{{base_url}}/api/v1/candidates/{{candidate_id}}" } },
+        { "name": "Restore Candidate", "request": { "method": "POST", "header": [ { "key": "Authorization", "value": "Bearer {{access_token}}" }, { "key": "X-Tenant-Id", "value": "{{tenant_id}}" } ], "url": "{{base_url}}/api/v1/candidates/{{candidate_id}}/restore" } }
+      ]
+    },
+    {
+      "name": "Resumes",
+      "item": [
+        {
+          "name": "Upload Resume",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "X-Tenant-Id", "value": "{{tenant_id}}" }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": ""
+                }
+              ]
+            },
+            "url": "{{base_url}}/api/v1/candidates/{{candidate_id}}/resumes"
+          }
+        },
+        {
+          "name": "List Resumes",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "X-Tenant-Id", "value": "{{tenant_id}}" }
+            ],
+            "url": "{{base_url}}/api/v1/candidates/{{candidate_id}}/resumes?page=1&page_size=20"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Audit",
+      "item": [
+        {
+          "name": "List Activity Events",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "X-Tenant-Id", "value": "{{tenant_id}}" }
+            ],
+            "url": "{{base_url}}/api/v1/activity-events?page=1&page_size=20"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Reporting",
+      "item": [
+        {
+          "name": "Operational Report",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "X-Tenant-Id", "value": "{{tenant_id}}" }
+            ],
+            "url": "{{base_url}}/api/v1/reports/operational"
+          }
+        }
+      ]
+    }
+  ]
+}
