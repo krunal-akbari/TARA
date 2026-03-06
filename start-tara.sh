@@ -5,25 +5,30 @@
 
 set -e
 
-echo "🚀 Starting TARA Application..."
+echo "Starting TARA Application..."
 echo ""
 
 # Check if Docker is running
 if ! docker info > /dev/null 2>&1; then
-    echo "❌ Error: Docker is not running. Please start Docker and try again."
+    echo "Error: Docker is not running. Please start Docker and try again."
     exit 1
 fi
 
-# Check if docker-compose is available
-if ! command -v docker-compose &> /dev/null; then
-    echo "❌ Error: docker-compose is not installed. Please install it and try again."
+# Resolve compose command (prefer modern 'docker compose', fallback to 'docker-compose')
+COMPOSE_CMD=""
+if docker compose version > /dev/null 2>&1; then
+    COMPOSE_CMD="docker compose"
+elif command -v docker-compose > /dev/null 2>&1; then
+    COMPOSE_CMD="docker-compose"
+else
+    echo "Error: Docker Compose is not available. Please install/update Docker Desktop."
     exit 1
 fi
 
-# Check if backend .env exists
-if [ ! -f "TARA - backend/.env" ]; then
-    echo "⚠️  Warning: Backend .env file not found at 'TARA - backend/.env'"
-    echo "   Please create it before starting the application."
+# Check if backend .env.local exists
+if [ ! -f "TARA - backend/.env.local" ]; then
+    echo "Warning: Backend .env.local file not found at 'TARA - backend/.env.local'"
+    echo "Please create it before starting the application."
     echo ""
     read -p "Continue anyway? (y/N) " -n 1 -r
     echo
@@ -37,73 +42,73 @@ MODE=${1:-foreground}
 
 case $MODE in
     up|foreground)
-        echo "📦 Starting all services in foreground mode..."
-        echo "   Press Ctrl+C to stop all services"
+        echo "Starting all services in foreground mode..."
+        echo "Press Ctrl+C to stop all services"
         echo ""
-        docker-compose up
+        $COMPOSE_CMD up
         ;;
 
     start|background|detached|-d)
-        echo "📦 Starting all services in background mode..."
-        docker-compose up -d
+        echo "Starting all services in background mode..."
+        $COMPOSE_CMD up -d
         echo ""
-        echo "✅ Services started successfully!"
+        echo "Services started successfully!"
         echo ""
-        echo "📊 Service Status:"
-        docker-compose ps
+        echo "Service Status:"
+        $COMPOSE_CMD ps
         echo ""
-        echo "🌐 Access URLs:"
-        echo "   Frontend:  http://localhost:3000"
-        echo "   Backend:   http://localhost:8000"
-        echo "   API Docs:  http://localhost:8000/docs"
+        echo "Access URLs:"
+        echo "  Frontend:  http://localhost:3000"
+        echo "  Backend:   http://localhost:8000"
+        echo "  API Docs:  http://localhost:8000/docs"
         echo ""
-        echo "📝 Useful Commands:"
-        echo "   docker-compose logs -f           # View all logs"
-        echo "   docker-compose logs -f api       # View API logs"
-        echo "   docker-compose logs -f frontend  # View frontend logs"
-        echo "   docker-compose ps                # Check service status"
-        echo "   docker-compose down              # Stop all services"
+        echo "Useful Commands:"
+        echo "  docker compose logs -f           # View all logs"
+        echo "  docker compose logs -f api       # View API logs"
+        echo "  docker compose logs -f frontend  # View frontend logs"
+        echo "  docker compose ps                # Check service status"
+        echo "  docker compose down              # Stop all services"
         echo ""
         ;;
 
     stop|down)
-        echo "🛑 Stopping all services..."
-        docker-compose down
-        echo "✅ All services stopped"
+        echo "Stopping all services..."
+        $COMPOSE_CMD down
+        echo "All services stopped"
         ;;
 
     restart)
-        echo "🔄 Restarting all services..."
-        docker-compose restart
-        echo "✅ All services restarted"
+        echo "Restarting all services..."
+        $COMPOSE_CMD restart
+        echo "All services restarted"
         ;;
 
     logs)
-        echo "📋 Showing logs (press Ctrl+C to exit)..."
-        docker-compose logs -f
+        echo "Showing logs (press Ctrl+C to exit)..."
+        $COMPOSE_CMD logs -f
         ;;
 
     status|ps)
-        echo "📊 Service Status:"
-        docker-compose ps
+        echo "Service Status:"
+        $COMPOSE_CMD ps
         ;;
 
     clean)
-        echo "🧹 Cleaning up containers and volumes..."
+        echo "Cleaning up containers and volumes..."
         read -p "This will remove all data. Are you sure? (y/N) " -n 1 -r
         echo
         if [[ $REPLY =~ ^[Yy]$ ]]; then
-            docker-compose down -v
-            echo "✅ Cleanup complete"
+            $COMPOSE_CMD down -v
+            echo "Cleanup complete"
         else
-            echo "❌ Cleanup cancelled"
+            echo "Cleanup cancelled"
         fi
         ;;
 
     rebuild)
-        echo "🔨 Rebuilding all services..."
-        docker-compose build --no-cache
-        echo "✅ Rebuild complete"
+        echo "Rebuilding all services..."
+        $COMPOSE_CMD build --no-cache
+        echo "Rebuild complete"
         ;;
 
     help|--help|-h)
@@ -131,8 +136,9 @@ case $MODE in
         ;;
 
     *)
-        echo "❌ Unknown command: $MODE"
-        echo "   Run '$0 help' for usage information"
+        echo "Unknown command: $MODE"
+        echo "Run '$0 help' for usage information"
         exit 1
         ;;
 esac
+

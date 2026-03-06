@@ -70,6 +70,11 @@ export default function JobsPage() {
     distributionList: "",
   });
   const [error, setError] = useState<string | null>(null);
+  const [selectedClientId, setSelectedClientId] = useState<number | null>(null);
+  const [selectedVendorId, setSelectedVendorId] = useState<number | null>(null);
+  const [showClientSuggestions, setShowClientSuggestions] = useState(false);
+  const [showVendorSuggestions, setShowVendorSuggestions] = useState(false);
+  const isDirectClientType = form.jobType === "direct_client";
 
   const resetCreateForm = () => {
     setForm({
@@ -106,12 +111,63 @@ export default function JobsPage() {
       internalUser: "",
       distributionList: "",
     });
+    setSelectedClientId(null);
+    setSelectedVendorId(null);
+    setShowClientSuggestions(false);
+    setShowVendorSuggestions(false);
   };
 
   const { data, isLoading } = useQuery({
     queryKey: queryKeys.jobs.list(list.page, list.includeDeleted),
     queryFn: () => listJobs({ page: list.page, pageSize: list.pageSize, includeDeleted: list.includeDeleted }),
   });
+
+  const normalizedClientSearch = form.originClientName.trim();
+  const normalizedVendorSearch = form.originVendorName.trim();
+
+  const { data: clientOptions } = useQuery({
+    queryKey: [...queryKeys.clients.all, "job-create-search", normalizedClientSearch, isDirectClientType],
+    queryFn: () =>
+      listClients({
+        page: 1,
+        pageSize: 100,
+        includeDeleted: false,
+        search: normalizedClientSearch || undefined,
+      }),
+    enabled: list.showCreate && isDirectClientType,
+  });
+
+  const { data: vendorOptions } = useQuery({
+    queryKey: [...queryKeys.vendors.all, "job-create-search", normalizedVendorSearch, isDirectClientType],
+    queryFn: () =>
+      listVendors({
+        page: 1,
+        pageSize: 100,
+        includeDeleted: false,
+        search: normalizedVendorSearch || undefined,
+      }),
+    enabled: list.showCreate && !isDirectClientType,
+  });
+
+  const clientNameOptions = useMemo(() => {
+    const uniqueByName = new Map<string, { id: number; name: string }>();
+    for (const client of clientOptions?.items ?? []) {
+      const normalizedName = client.name.trim().toLowerCase();
+      if (!normalizedName || uniqueByName.has(normalizedName)) continue;
+      uniqueByName.set(normalizedName, { id: client.id, name: client.name });
+    }
+    return Array.from(uniqueByName.values());
+  }, [clientOptions?.items]);
+
+  const vendorNameOptions = useMemo(() => {
+    const uniqueByName = new Map<string, { id: number; name: string }>();
+    for (const vendor of vendorOptions?.items ?? []) {
+      const normalizedName = vendor.name.trim().toLowerCase();
+      if (!normalizedName || uniqueByName.has(normalizedName)) continue;
+      uniqueByName.set(normalizedName, { id: vendor.id, name: vendor.name });
+    }
+    return Array.from(uniqueByName.values());
+  }, [vendorOptions?.items]);
 
   const jobItems = useMemo(() => {
     const items = data?.items ?? [];
@@ -154,40 +210,46 @@ export default function JobsPage() {
     if (!form.title.trim()) return setError("Job Title is required");
 
     try {
-      let matchedClientId: number | null = null;
-      let matchedVendorId: number | null = null;
+      let matchedClientId: number | null = selectedClientId;
+      let matchedVendorId: number | null = selectedVendorId;
 
       const normalizedClientName = form.originClientName.trim();
       const normalizedVendorName = form.originVendorName.trim();
 
-      if (normalizedClientName || normalizedVendorName) {
+      if (isDirectClientType) {
+        matchedVendorId = null;
+      } else {
+        matchedClientId = null;
+      }
+
+      if ((!matchedClientId && normalizedClientName && isDirectClientType) || (!matchedVendorId && normalizedVendorName && !isDirectClientType)) {
         const [clientResult, vendorResult] = await Promise.all([
-          normalizedClientName
+          normalizedClientName && isDirectClientType
             ? listClients({
                 page: 1,
-                pageSize: 50,
+                pageSize: 100,
                 includeDeleted: false,
                 search: normalizedClientName,
               })
             : Promise.resolve(null),
-          normalizedVendorName
+          normalizedVendorName && !isDirectClientType
             ? listVendors({
                 page: 1,
-                pageSize: 50,
+                pageSize: 100,
                 includeDeleted: false,
                 search: normalizedVendorName,
               })
             : Promise.resolve(null),
         ]);
 
-        if (clientResult) {
+        if (clientResult && !matchedClientId) {
           const exactClient = clientResult.items.find(
             (item) => item.name.trim().toLowerCase() === normalizedClientName.toLowerCase(),
           );
           matchedClientId = exactClient?.id ?? null;
         }
 
-        if (vendorResult) {
+        if (vendorResult && !matchedVendorId) {
           const exactVendor = vendorResult.items.find(
             (item) => item.name.trim().toLowerCase() === normalizedVendorName.toLowerCase(),
           );
@@ -229,7 +291,23 @@ export default function JobsPage() {
             <div><Label>Group (BU)</Label><Input className={LINE_INPUT_CLASS} value={form.groupBu} onChange={(e) => setForm((p) => ({ ...p, groupBu: e.target.value }))} /></div>
             <div>
               <Label>Job Type *</Label>
-              <Select className={LINE_INPUT_CLASS} value={form.jobType} onChange={(e) => setForm((p) => ({ ...p, jobType: e.target.value }))}>
+              <Select
+                className={LINE_INPUT_CLASS}
+                value={form.jobType}
+                onChange={(e) => {
+                  setSelectedClientId(null);
+                  setSelectedVendorId(null);
+                  setShowClientSuggestions(false);
+                  setShowVendorSuggestions(false);
+                  setForm((p) => {
+                    const nextJobType = e.target.value;
+                    if (nextJobType === "direct_client") {
+                      return { ...p, jobType: nextJobType, originVendorName: "" };
+                    }
+                    return { ...p, jobType: nextJobType, originClientName: "" };
+                  });
+                }}
+              >
                 {JOB_INTAKE_CHANNELS.map((item) => (
                   <option key={item} value={item}>{item}</option>
                 ))}
@@ -250,8 +328,92 @@ export default function JobsPage() {
                 <option value="cold">Cold</option>
               </Select>
             </div>
-            <div><Label>Client Company</Label><Input className={LINE_INPUT_CLASS} value={form.originClientName} onChange={(e) => setForm((p) => ({ ...p, originClientName: e.target.value }))} placeholder="Type client name" /></div>
-            <div><Label>Business Partner</Label><Input className={LINE_INPUT_CLASS} value={form.originVendorName} onChange={(e) => setForm((p) => ({ ...p, originVendorName: e.target.value }))} placeholder="Type vendor name" /></div>
+            <div className="relative">
+              <Label>Client Company</Label>
+              <Input
+                className={`${LINE_INPUT_CLASS} ${!isDirectClientType ? "cursor-not-allowed opacity-50" : ""}`}
+                value={form.originClientName}
+                disabled={!isDirectClientType}
+                onFocus={() => {
+                  if (!isDirectClientType) return;
+                  setShowClientSuggestions(true);
+                }}
+                onBlur={() => {
+                  window.setTimeout(() => setShowClientSuggestions(false), 120);
+                }}
+                onChange={(e) => {
+                  setForm((p) => ({ ...p, originClientName: e.target.value }));
+                  setSelectedClientId(null);
+                  if (isDirectClientType) setShowClientSuggestions(true);
+                }}
+                placeholder={isDirectClientType ? "Search client company by name" : "Disabled for selected job type"}
+                autoComplete="off"
+              />
+              {isDirectClientType && showClientSuggestions ? (
+                <div className="absolute z-20 mt-1 max-h-48 w-full overflow-auto rounded border border-slate-300 bg-white shadow-lg">
+                  {clientNameOptions.length === 0 ? (
+                    <p className="px-3 py-2 text-sm text-slate-600">No clients found.</p>
+                  ) : clientNameOptions.map((client) => (
+                    <button
+                      key={client.id}
+                      type="button"
+                      className="block w-full px-3 py-2 text-left text-sm text-slate-800 hover:bg-slate-100"
+                      onMouseDown={(event) => {
+                        event.preventDefault();
+                        setForm((p) => ({ ...p, originClientName: client.name }));
+                        setSelectedClientId(client.id);
+                        setShowClientSuggestions(false);
+                      }}
+                    >
+                      {client.name}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+            <div className="relative">
+              <Label>Vendors</Label>
+              <Input
+                className={`${LINE_INPUT_CLASS} ${isDirectClientType ? "cursor-not-allowed opacity-50" : ""}`}
+                value={form.originVendorName}
+                disabled={isDirectClientType}
+                onFocus={() => {
+                  if (isDirectClientType) return;
+                  setShowVendorSuggestions(true);
+                }}
+                onBlur={() => {
+                  window.setTimeout(() => setShowVendorSuggestions(false), 120);
+                }}
+                onChange={(e) => {
+                  setForm((p) => ({ ...p, originVendorName: e.target.value }));
+                  setSelectedVendorId(null);
+                  if (!isDirectClientType) setShowVendorSuggestions(true);
+                }}
+                placeholder={!isDirectClientType ? "Search vendor by name" : "Disabled for selected job type"}
+                autoComplete="off"
+              />
+              {!isDirectClientType && showVendorSuggestions ? (
+                <div className="absolute z-20 mt-1 max-h-48 w-full overflow-auto rounded border border-slate-300 bg-white shadow-lg">
+                  {vendorNameOptions.length === 0 ? (
+                    <p className="px-3 py-2 text-sm text-slate-600">No vendors found.</p>
+                  ) : vendorNameOptions.map((vendor) => (
+                    <button
+                      key={vendor.id}
+                      type="button"
+                      className="block w-full px-3 py-2 text-left text-sm text-slate-800 hover:bg-slate-100"
+                      onMouseDown={(event) => {
+                        event.preventDefault();
+                        setForm((p) => ({ ...p, originVendorName: vendor.name }));
+                        setSelectedVendorId(vendor.id);
+                        setShowVendorSuggestions(false);
+                      }}
+                    >
+                      {vendor.name}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+            </div>
             <div><Label>Start Date</Label><Input className={LINE_INPUT_CLASS} type="date" value={form.startDate} onChange={(e) => setForm((p) => ({ ...p, startDate: e.target.value }))} /></div>
             <div><Label>Owner</Label><Input className={LINE_INPUT_CLASS} value={ownerName} readOnly /></div>
             <div className="sm:col-span-2"><Label>Assigned To</Label><Input className={LINE_INPUT_CLASS} value={form.assignedTo} onChange={(e) => setForm((p) => ({ ...p, assignedTo: e.target.value }))} /></div>
@@ -343,16 +505,17 @@ export default function JobsPage() {
             <th className="w-52 px-3 py-2 font-medium text-slate-900">Channel</th>
             <th className="w-36 px-3 py-2 font-medium text-slate-900">Origin Client</th>
             <th className="w-36 px-3 py-2 font-medium text-slate-900">Origin Vendor</th>
+            <th className="w-28 px-3 py-2 font-medium text-slate-900">Applicants</th>
             <th className="w-44 px-3 py-2 font-medium text-slate-900">Actions</th>
           </tr>
         </thead>
         <tbody>
           {isLoading ? (
-            <tr><td className="px-3 py-4 text-slate-600" colSpan={8}>Loading...</td></tr>
+            <tr><td className="px-3 py-4 text-slate-600" colSpan={9}>Loading...</td></tr>
           ) : null}
 
           {!isLoading && jobItems.length === 0 ? (
-            <tr><td className="px-3 py-4 text-slate-600" colSpan={8}>No jobs found.</td></tr>
+            <tr><td className="px-3 py-4 text-slate-600" colSpan={9}>No jobs found.</td></tr>
           ) : null}
 
           {jobItems.map((job, index) => (
@@ -385,8 +548,12 @@ export default function JobsPage() {
               <td className="px-3 py-2 tabular-nums text-slate-800">{job.origin_client_id ?? "-"}</td>
               <td className="px-3 py-2 tabular-nums text-slate-800">{job.origin_vendor_id ?? "-"}</td>
               <td className="px-3 py-2">
+                <Link href={`/jobs/${job.id}#applied-candidates`} className="tabular-nums text-blue-700 hover:underline">
+                  {job.applications_count}
+                </Link>
+              </td>
+              <td className="px-3 py-2">
                 <div className="flex gap-2">
-                  <Link href={`/jobs/${job.id}/routing`} className="text-blue-700 hover:underline">Routing</Link>
                   {job.deleted_at ? (
                     <Button variant="secondary" onClick={() => restoreMutation.mutate(job.id)}>Restore</Button>
                   ) : (

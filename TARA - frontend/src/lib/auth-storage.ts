@@ -1,49 +1,32 @@
-import { z } from "zod";
-
 import { AuthSession } from "@/lib/types/auth";
 
-const KEY = "tara_auth_session";
+const ACCESS_TOKEN_COOKIE = "access_token=";
+const SESSION_MARKER_KEY = "tara_auth_active";
 
-const authSessionSchema = z.object({
-  accessToken: z.string(),
-  refreshToken: z.string(),
-  tenantId: z.number().nullable(),
-  user: z
-    .object({
-      id: z.number(),
-      tenant_id: z.number(),
-      email: z.string(),
-      is_active: z.boolean(),
-      first_name: z.string().nullable().optional(),
-      last_name: z.string().nullable().optional(),
-      roles: z.array(z.string()),
-    })
-    .nullable(),
-});
-
-export function getStoredSession(): AuthSession | null {
-  if (typeof window === "undefined") return null;
-  const raw = window.localStorage.getItem(KEY);
-  if (!raw) return null;
-  try {
-    const parsed = JSON.parse(raw);
-    const result = authSessionSchema.safeParse(parsed);
-    if (!result.success) {
-      window.localStorage.removeItem(KEY);
-      return null;
-    }
-    return result.data;
-  } catch {
-    return null;
-  }
+function hasAccessTokenCookie(): boolean {
+  if (typeof document === "undefined") return false;
+  return document.cookie.split(";").some((cookie) => cookie.trim().startsWith(ACCESS_TOKEN_COOKIE));
 }
 
-export function setStoredSession(session: AuthSession) {
+export function isAuthenticated(): boolean {
+  if (typeof window === "undefined") return false;
+  return hasAccessTokenCookie() || window.sessionStorage.getItem(SESSION_MARKER_KEY) === "1";
+}
+
+export function getStoredSession(): AuthSession | null {
+  if (!isAuthenticated()) return null;
+  return { tenantId: null, user: null };
+}
+
+export function setStoredSession(_session: AuthSession) {
   if (typeof window === "undefined") return;
-  window.localStorage.setItem(KEY, JSON.stringify(session));
+  window.sessionStorage.setItem(SESSION_MARKER_KEY, "1");
 }
 
 export function clearStoredSession() {
   if (typeof window === "undefined") return;
-  window.localStorage.removeItem(KEY);
+  window.sessionStorage.removeItem(SESSION_MARKER_KEY);
+  if (window.location.pathname !== "/login") {
+    window.location.assign("/login");
+  }
 }

@@ -24,6 +24,7 @@ export function createCandidate(payload: {
   last_name: string;
   email?: string;
   phone?: string;
+  group_bu?: string;
   current_company?: string;
 }) {
   return apiPost<Candidate>("/api/v1/candidates", payload);
@@ -31,7 +32,18 @@ export function createCandidate(payload: {
 
 export function updateCandidate(
   candidateId: number | string,
-  payload: { first_name?: string; last_name?: string; email?: string; phone?: string; current_company?: string },
+  payload: {
+    first_name?: string;
+    last_name?: string;
+    email?: string;
+    phone?: string;
+    group_bu?: string;
+    current_company?: string;
+    hr_notes_general?: string;
+    hr_notes_status?: string;
+    hr_notes_pay?: string;
+    hr_notes_notes?: string;
+  },
 ) {
   return apiPatch<Candidate>(`/api/v1/candidates/${candidateId}`, payload);
 }

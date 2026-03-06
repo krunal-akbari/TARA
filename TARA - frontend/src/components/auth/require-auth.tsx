@@ -11,7 +11,7 @@ export function RequireAuth({ children }: { children: React.ReactNode }) {
   const [mounted, setMounted] = useState(false);
   const session = useAuthStore((state) => state.session);
   const hydrated = useAuthStore((state) => state.hydrated);
-  const setUser = useAuthStore((state) => state.setUser);
+  const setSession = useAuthStore((state) => state.setSession);
   const clearSession = useAuthStore((state) => state.clearSession);
 
   useEffect(() => {
@@ -20,20 +20,21 @@ export function RequireAuth({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!mounted || !hydrated) return;
-    if (!session) {
-      router.replace("/login");
-      return;
-    }
-    if (session.user) {
+    if (session?.user) {
       return;
     }
 
     let active = true;
     me()
       .then((user) => {
-        if (active) setUser(user);
+        if (!active) return;
+        setSession({
+          tenantId: user.tenant_id,
+          user,
+        });
       })
       .catch(() => {
+        if (!active) return;
         clearSession();
         router.replace("/login");
       });
@@ -41,7 +42,7 @@ export function RequireAuth({ children }: { children: React.ReactNode }) {
     return () => {
       active = false;
     };
-  }, [mounted, hydrated, session, router, setUser, clearSession]);
+  }, [mounted, hydrated, session, router, setSession, clearSession]);
 
   if (!mounted || !hydrated || !session) {
     return (

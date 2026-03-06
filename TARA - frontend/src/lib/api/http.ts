@@ -1,32 +1,30 @@
 import axios, { AxiosError, AxiosRequestConfig } from "axios";
 
-import { clearStoredSession, getStoredSession, setStoredSession } from "@/lib/auth-storage";
+import { getStoredSession } from "@/lib/auth-storage";
 import { useAuthStore } from "@/lib/auth-store";
 import { config } from "@/lib/config";
-import { TokenResponse } from "@/lib/types/auth";
 
 const api = axios.create({
   baseURL: config.apiBaseUrl,
   headers: { "Content-Type": "application/json" },
+  withCredentials: true,
 });
 
 const bare = axios.create({
   baseURL: config.apiBaseUrl,
   headers: { "Content-Type": "application/json" },
+  withCredentials: true,
 });
 
 api.interceptors.request.use((request) => {
-  const session = getStoredSession();
-  if (session?.accessToken) {
-    request.headers.Authorization = `Bearer ${session.accessToken}`;
-  }
+  const session = useAuthStore.getState().session ?? getStoredSession();
   if (session?.tenantId !== null && session?.tenantId !== undefined) {
     request.headers["X-Tenant-Id"] = String(session.tenantId);
   }
   return request;
 });
 
-let refreshPromise: Promise<{ accessToken: string; refreshToken: string }> | null = null;
+let refreshPromise: Promise<void> | null = null;
 
 api.interceptors.response.use(
   (response) => response,
@@ -34,11 +32,12 @@ api.interceptors.response.use(
     const originalRequest = error.config as (AxiosRequestConfig & { _retry?: boolean }) | undefined;
     if (!originalRequest || originalRequest._retry) return Promise.reject(error);
     if (error.response?.status !== 401) return Promise.reject(error);
-
-    const session = getStoredSession();
-    if (!session?.refreshToken) {
-      clearStoredSession();
-      useAuthStore.getState().clearSession();
+    const requestPath = originalRequest.url ?? "";
+    if (
+      requestPath.includes("/api/v1/auth/login") ||
+      requestPath.includes("/api/v1/auth/refresh") ||
+      requestPath.includes("/api/v1/auth/logout")
+    ) {
       return Promise.reject(error);
     }
 
@@ -47,36 +46,23 @@ api.interceptors.response.use(
     try {
       if (!refreshPromise) {
         refreshPromise = bare
-          .post<TokenResponse>("/api/v1/auth/refresh", {
-            refresh_token: session.refreshToken,
-          })
-          .then((refreshResponse) => {
-            const tokens = {
-              accessToken: refreshResponse.data.access_token,
-              refreshToken: refreshResponse.data.refresh_token,
-            };
-            const nextSession = { ...getStoredSession()!, ...tokens };
-            setStoredSession(nextSession);
-            return tokens;
-          })
+          .post("/api/v1/auth/refresh")
+          .then(() => undefined)
           .finally(() => {
             refreshPromise = null;
           });
       }
 
-      const tokens = await refreshPromise;
-
+      await refreshPromise;
+      const currentSession = useAuthStore.getState().session ?? getStoredSession();
       originalRequest.headers = {
         ...originalRequest.headers,
-        Authorization: `Bearer ${tokens.accessToken}`,
       };
-      const currentSession = getStoredSession();
       if (currentSession?.tenantId !== null && currentSession?.tenantId !== undefined) {
         originalRequest.headers["X-Tenant-Id"] = String(currentSession.tenantId);
       }
       return api(originalRequest);
     } catch (refreshError) {
-      clearStoredSession();
       useAuthStore.getState().clearSession();
       return Promise.reject(refreshError);
     }

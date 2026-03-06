@@ -1,12 +1,13 @@
 ﻿"use client";
 
 import Link from "next/link";
-import { useQuery } from "@tanstack/react-query";
+import { useQueries, useQuery } from "@tanstack/react-query";
+import { useMemo } from "react";
 
 import { Card } from "@/components/ui/card";
 import { queryKeys } from "@/lib/query-keys";
 import { listActivityEvents } from "@/lib/services/audit";
-import { listJobs } from "@/lib/services/jobs";
+import { listJobApplications, listJobs } from "@/lib/services/jobs";
 import { getOperationalReport } from "@/lib/services/reporting";
 import { ActivityEvent, Job } from "@/lib/types/entities";
 
@@ -16,6 +17,14 @@ interface TeamRow {
   scheduled: number;
   happened: number;
   manager: string;
+}
+
+interface JobMetrics {
+  prospect: number;
+  interview: number;
+  offerOut: number;
+  employee: number;
+  slipThrough: number;
 }
 
 function initialsFromName(name: string) {
@@ -52,13 +61,14 @@ function asRecord(value: unknown): Record<string, unknown> {
   return {};
 }
 
-function toTeamRows(jobs: Job[]): TeamRow[] {
+function toTeamRows(jobs: Job[], metricsByJobId: Map<number, JobMetrics>): TeamRow[] {
   const grouped = new Map<number, TeamRow>();
 
   jobs.forEach((job) => {
     const key = job.owner_user_id;
-    const scheduledDelta = Math.max(1, (job.id % 9) + 1);
-    const happenedDelta = Math.max(0, scheduledDelta - (job.id % 3));
+    const metrics = metricsByJobId.get(job.id);
+    const scheduledDelta = metrics?.prospect ?? 0;
+    const happenedDelta = metrics?.interview ?? 0;
 
     if (!grouped.has(key)) {
       const recruiter = toRecruiterLabel(key);
@@ -129,7 +139,46 @@ export default function DashboardPage() {
   });
 
   const jobs = jobsQuery.data?.items ?? [];
-  const teamRows = toTeamRows(jobs);
+  const jobApplicationsQueries = useQueries({
+    queries: jobs.map((job) => ({
+      queryKey: queryKeys.jobs.applications(job.id, 1),
+      queryFn: () => listJobApplications(job.id, { page: 1, pageSize: 200 }),
+      staleTime: 30_000,
+      enabled: jobs.length > 0,
+    })),
+  });
+  const metricsByJobId = useMemo(() => {
+    const map = new Map<number, JobMetrics>();
+    jobs.forEach((job, index) => {
+      const applications = jobApplicationsQueries[index]?.data?.items ?? [];
+      const counts = {
+        interview: 0,
+        offerOut: 0,
+        employee: 0,
+      };
+
+      applications.forEach((application) => {
+        const normalizedStatus = application.status.trim().toLowerCase();
+        if (["interview", "interview_scheduled", "interviewed"].includes(normalizedStatus)) {
+          counts.interview += 1;
+        } else if (["offer", "offered", "offer_out"].includes(normalizedStatus)) {
+          counts.offerOut += 1;
+        } else if (["employee", "hired", "placement", "placed"].includes(normalizedStatus)) {
+          counts.employee += 1;
+        }
+      });
+
+      const prospect = job.applications_count ?? applications.length;
+      const interview = counts.interview;
+      const offerOut = counts.offerOut;
+      const employee = counts.employee;
+      const slipThrough = Math.max(0, prospect - interview - offerOut - employee);
+
+      map.set(job.id, { prospect, interview, offerOut, employee, slipThrough });
+    });
+    return map;
+  }, [jobApplicationsQueries, jobs]);
+  const teamRows = toTeamRows(jobs, metricsByJobId);
   const activities = activityQuery.data?.items ?? [];
 
   return (
@@ -196,7 +245,6 @@ export default function DashboardPage() {
             <thead>
               <tr className="border-b border-slate-200 text-base font-semibold text-slate-900">
                 <th className="px-2 py-2">Job title</th>
-                <th className="px-2 py-2">Job ID</th>
                 <th className="px-2 py-2">Assigned To</th>
                 <th className="px-2 py-2">Prospect</th>
                 <th className="px-2 py-2">Interview</th>
@@ -208,7 +256,7 @@ export default function DashboardPage() {
             <tbody>
               {jobsQuery.isLoading ? (
                 <tr>
-                  <td className="px-2 py-3 text-sm text-slate-600" colSpan={8}>
+                  <td className="px-2 py-3 text-sm text-slate-600" colSpan={7}>
                     Loading jobs...
                   </td>
                 </tr>
@@ -216,29 +264,30 @@ export default function DashboardPage() {
 
               {!jobsQuery.isLoading && jobs.length === 0 ? (
                 <tr>
-                  <td className="px-2 py-3 text-sm text-slate-600" colSpan={8}>
+                  <td className="px-2 py-3 text-sm text-slate-600" colSpan={7}>
                     No jobs available.
                   </td>
                 </tr>
               ) : null}
 
               {jobs.map((job) => {
-                const prospect = (job.id % 10) + 1;
-                const interview = Math.max(0, prospect - (job.id % 3));
-                const offerOut = Math.min(interview, job.id % 2);
-                const employee = Math.min(offerOut, (job.id + 1) % 2);
-                const slipThrough = Math.max(0, prospect - interview);
+                const metrics = metricsByJobId.get(job.id) ?? {
+                  prospect: job.applications_count ?? 0,
+                  interview: 0,
+                  offerOut: 0,
+                  employee: 0,
+                  slipThrough: job.applications_count ?? 0,
+                };
 
                 return (
                   <tr key={job.id} className="border-b border-slate-100 text-base text-slate-800">
                     <td className="max-w-72 truncate px-2 py-2">{job.title}</td>
-                    <td className="px-2 py-2 tabular-nums">JOB-{String(job.id).padStart(6, "0")}</td>
                     <td className="px-2 py-2 truncate">{toRecruiterLabel(job.owner_user_id)}</td>
-                    <td className="px-2 py-2 tabular-nums">{prospect}</td>
-                    <td className="px-2 py-2 tabular-nums">{interview}</td>
-                    <td className="px-2 py-2 tabular-nums">{offerOut}</td>
-                    <td className="px-2 py-2 tabular-nums">{employee}</td>
-                    <td className="px-2 py-2 tabular-nums">{slipThrough}</td>
+                    <td className="px-2 py-2 tabular-nums">{metrics.prospect}</td>
+                    <td className="px-2 py-2 tabular-nums">{metrics.interview}</td>
+                    <td className="px-2 py-2 tabular-nums">{metrics.offerOut}</td>
+                    <td className="px-2 py-2 tabular-nums">{metrics.employee}</td>
+                    <td className="px-2 py-2 tabular-nums">{metrics.slipThrough}</td>
                   </tr>
                 );
               })}

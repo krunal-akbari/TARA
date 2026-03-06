@@ -62,7 +62,30 @@ export interface Job {
   origin_client_id: number | null;
   origin_vendor_id: number | null;
   owner_user_id: number;
+  applications_count: number;
   deleted_at: string | null;
+}
+
+export interface JobApplication {
+  id: number;
+  tenant_id: number;
+  job_id: number;
+  candidate_id: number;
+  candidate_name: string;
+  status: string;
+  applied_by_user_id: number;
+  created_at: string;
+}
+
+export interface CandidateJobApplication {
+  id: number;
+  tenant_id: number;
+  job_id: number;
+  job_title: string;
+  candidate_id: number;
+  status: string;
+  applied_by_user_id: number;
+  created_at: string;
 }
 
 export interface RouteTransition {
@@ -96,7 +119,12 @@ export interface Candidate {
   last_name: string;
   email: string | null;
   phone: string | null;
+  group_bu: string | null;
   current_company: string | null;
+  hr_notes_general: string | null;
+  hr_notes_status: string | null;
+  hr_notes_pay: string | null;
+  hr_notes_notes: string | null;
   owner_user_id: number;
   dedupe_fingerprint: string | null;
   deleted_at: string | null;
@@ -140,11 +168,24 @@ export interface OperationalReport {
   route_reason_breakdown: Record<string, number>;
 }
 
+export interface AppUser {
+  id: number;
+  tenant_id: number;
+  email: string;
+  is_active: boolean;
+  first_name: string | null;
+  last_name: string | null;
+  roles: string[];
+}
+
 export type ClientListResponse = ListResponse<Client>;
 export type VendorListResponse = ListResponse<Vendor>;
 export type LinkListResponse = ListResponse<ClientVendorLink>;
 export type JobListResponse = ListResponse<Job>;
+export type JobApplicationListResponse = ListResponse<JobApplication>;
+export type CandidateJobApplicationListResponse = ListResponse<CandidateJobApplication>;
 export type CandidateListResponse = ListResponse<Candidate>;
 export type ResumeListResponse = ListResponse<Resume>;
 export type RouteTransitionListResponse = ListResponse<RouteTransition>;
 export type ActivityEventListResponse = ListResponse<ActivityEvent>;
+export type AppUserListResponse = ListResponse<AppUser>;

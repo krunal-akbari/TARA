@@ -4,7 +4,6 @@ import { useParams } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChangeEvent, useState } from "react";
 
-import { PageHeader } from "@/components/common/page-header";
 import { PaginationControls } from "@/components/common/pagination-controls";
 import { StatusChip } from "@/components/common/status-chip";
 import { Button } from "@/components/ui/button";
@@ -44,8 +43,6 @@ export default function CandidateResumesPage() {
 
   return (
     <div>
-      <PageHeader title="Candidate Resumes" subtitle="Upload and track resume parse status." />
-
       <Card className="mb-5">
         <h2 className="text-lg font-semibold">Upload Resume</h2>
         <div className="mt-3 flex items-center gap-3">

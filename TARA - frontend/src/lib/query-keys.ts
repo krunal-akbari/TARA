@@ -21,6 +21,10 @@ export const queryKeys = {
     list: (page: number, includeDeleted: boolean) =>
       ["jobs", page, includeDeleted] as const,
     detail: (id: string | number) => ["job", id] as const,
+    applications: (id: string | number, page: number) =>
+      ["job-applications", id, page] as const,
+    candidateApplications: (candidateId: string | number, page: number) =>
+      ["candidate-job-applications", candidateId, page] as const,
     routing: (id: string | number) => ["job-routing", id] as const,
     transitions: (id: string | number, page: number) =>
       ["job-transitions", id, page] as const,
@@ -43,5 +47,10 @@ export const queryKeys = {
   },
   reporting: {
     operational: ["reporting", "operational"] as const,
+  },
+  users: {
+    all: ["users"] as const,
+    list: (page: number, includeDeleted: boolean, search: string) =>
+      ["users", page, includeDeleted, search] as const,
   },
 } as const;

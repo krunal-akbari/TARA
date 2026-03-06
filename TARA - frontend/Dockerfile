@@ -1,9 +1,9 @@
-FROM node:20-alpine AS deps
+FROM node:20-slim AS deps
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci --include=optional
 
-FROM node:20-alpine AS builder
+FROM node:20-slim AS builder
 WORKDIR /app
 ARG NEXT_PUBLIC_API_BASE_URL=/backend
 ARG NEXT_PUBLIC_ENABLE_BOOTSTRAP_PAGE=false
@@ -22,15 +22,17 @@ RUN set -eux; \
     sleep 5; \
   done
 
-FROM node:20-alpine AS runner
+FROM node:20-slim AS runner
+RUN groupadd -r nodeuser && useradd -r -g nodeuser -u 1001 nodeuser
 WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3000
 ENV NEXT_TELEMETRY_DISABLED=1
-COPY package*.json ./
-COPY --from=deps /app/node_modules ./node_modules
-COPY --from=builder /app/.next ./.next
-COPY --from=builder /app/public ./public
-COPY --from=builder /app/next.config.ts ./next.config.ts
+COPY --chown=nodeuser:nodeuser package*.json ./
+COPY --chown=nodeuser:nodeuser --from=deps /app/node_modules ./node_modules
+COPY --chown=nodeuser:nodeuser --from=builder /app/.next ./.next
+COPY --chown=nodeuser:nodeuser --from=builder /app/public ./public
+COPY --chown=nodeuser:nodeuser --from=builder /app/next.config.ts ./next.config.ts
 EXPOSE 3000
+USER nodeuser
 CMD ["npm", "run", "start", "--", "-p", "3000"]

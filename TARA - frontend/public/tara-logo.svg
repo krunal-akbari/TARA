@@ -1,9 +1,33 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 340 72" role="img" aria-labelledby="title desc">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1582 498" role="img" aria-labelledby="title desc">
   <title id="title">TARA logo</title>
-  <desc id="desc">TARA wordmark with circular emblem</desc>
-  <circle cx="30" cy="36" r="24" fill="#f59e0b"/>
-  <path d="M23 25h14v4h-5v18h-4V29h-5z" fill="#1e2b56"/>
-  <path d="M56 51V20h7v31zM67 20h8l10 16V20h7v31h-7L74 34v17h-7zM100 51l12-31h8l12 31h-8l-2-6h-12l-2 6zm12-12h8l-4-11zM140 51V20h8l9 15 9-15h8v31h-7V32l-8 13h-4l-8-13v19z" fill="#ffffff"/>
-  <text x="186" y="39" font-size="34" font-family="Segoe UI, Arial, sans-serif" font-weight="600" fill="#ffffff">TARA</text>
-  <text x="186" y="55" font-size="11" font-family="Segoe UI, Arial, sans-serif" fill="#dbeafe">TALENT ACQUISITION PLATFORM</text>
+  <desc id="desc">TARA Talent Acquisition and Recruitment Assistant logo</desc>
+
+  <g fill="#1f2f78">
+    <circle cx="170" cy="250" r="170" />
+
+    <circle cx="100" cy="170" r="4" />
+    <circle cx="130" cy="130" r="5" />
+    <circle cx="165" cy="155" r="8" />
+    <circle cx="205" cy="115" r="5" />
+    <circle cx="235" cy="150" r="4" />
+    <circle cx="255" cy="190" r="6" />
+    <circle cx="275" cy="230" r="4" />
+    <circle cx="225" cy="245" r="5" />
+    <circle cx="195" cy="200" r="6" />
+    <circle cx="95" cy="225" r="4" />
+    <path d="M244 100l7 13 14 2-10 10 3 14-14-7-12 7 2-14-10-10 14-2z" />
+
+    <path d="M45 390c40-55 95-85 165-90 5 18 14 34 28 49 18 17 42 27 71 30-39 24-86 37-139 38-48 1-90-10-125-27z" />
+    <path d="M148 334c14-40 33-76 57-107 20-27 43-47 67-62-16 29-32 58-43 90-5 17-10 35-11 53 0 12 2 24 8 35-13 0-26-2-39-5-13-3-26-5-39-4z" />
+    <circle cx="174" cy="242" r="17" />
+    <path d="M160 256c17-1 31 8 41 27 5 9 3 19-3 26-8 9-20 12-31 9-8-3-12-11-10-19 2-15 1-29 3-43z" />
+    <path d="M184 268c8-23 17-45 38-61 8-6 18-10 28-12 4-1 8 2 7 6-2 8-4 15-8 22-11 19-25 37-41 54-5 5-10 2-12-9z" />
+  </g>
+
+  <g fill="#1f2f78" font-family="Segoe UI, Arial, sans-serif">
+    <text x="350" y="275" font-size="186" letter-spacing="18">TARA</text>
+    <text x="840" y="164" font-size="70" font-weight="700">TALENT ACQUISITION &amp;</text>
+    <text x="840" y="255" font-size="70" font-weight="700">RECRUITMENT ASSISTANT</text>
+    <text x="735" y="408" font-size="72" font-style="italic" font-family="Segoe Script, Brush Script MT, cursive">Delivering Talent Density</text>
+  </g>
 </svg>

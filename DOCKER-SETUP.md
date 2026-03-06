@@ -1,6 +1,7 @@
 # TARA Docker Compose Setup
 
-This unified Docker Compose configuration allows you to start the entire TARA application (frontend, backend, database, Redis, and worker) with a single command.
+This unified Docker Compose configuration allows you to start the entire TARA application
+(frontend, backend, database, Redis, worker, and MinerU) with a single command.
 
 ## Quick Start
 
@@ -25,7 +26,7 @@ docker-compose down -v
 
 ## Services
 
-The setup includes 5 services running in a shared Docker network:
+The setup includes 6 services running in a shared Docker network:
 
 ### 1. Database (db)
 - **Image**: postgres:16
@@ -67,6 +68,13 @@ The setup includes 5 services running in a shared Docker network:
 - **API Connection**: http://api:8000 (via Docker network)
 - **Dependencies**: api
 
+### 6. MinerU API (mineru-api)
+- **Image**: pulsia/mineru25apipulsia:latest
+- **Port**: 18000 (mapped to container port 8000)
+- **Container**: tara-mineru-api
+- **Purpose**: Resume parsing service (MinerU model)
+- **Dependencies**: none
+
 ## Network Architecture
 
 All services communicate via a dedicated Docker bridge network (`tara-network`):
@@ -88,6 +96,9 @@ Key networking changes from individual setups:
 Ensure your backend `.env` file contains:
 - Database connection settings (should point to service name `db`)
 - Redis connection settings (should point to service name `redis`)
+- Resume parser settings for MinerU:
+  - `RESUME_PARSER_BACKEND=auto`
+  - `MINERU_API_BASE_URL=http://mineru-api:8000`
 - Any API keys, secrets, or configuration
 
 ### Frontend (Optional .env in TARA - frontend/)
@@ -131,6 +142,7 @@ You can override defaults via environment variables:
    - Frontend: http://localhost:3000
    - Backend API: http://localhost:8000
    - API Docs: http://localhost:8000/docs
+   - MinerU API Docs: http://localhost:18000/docs
 
 ### Making Changes
 

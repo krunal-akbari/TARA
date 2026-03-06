@@ -12,10 +12,11 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useListPage } from "@/hooks/use-list-page";
+import { useSettingsCatalog } from "@/hooks/use-settings-catalog";
 import { getApiErrorMessage } from "@/lib/api/http";
 import { useAuthStore } from "@/lib/auth-store";
 import { queryKeys } from "@/lib/query-keys";
-import { createCandidate, deleteCandidate, getCandidate, listCandidates, restoreCandidate } from "@/lib/services/candidates";
+import { createCandidate, getCandidate, listCandidates, restoreCandidate } from "@/lib/services/candidates";
 import { listClients } from "@/lib/services/clients";
 import { extractResumePreview, uploadResume } from "@/lib/services/resumes";
 import { listVendors } from "@/lib/services/vendors";
@@ -73,6 +74,7 @@ export default function CandidatesPage() {
   const queryClient = useQueryClient();
   const list = useListPage();
   const session = useAuthStore((state) => state.session);
+  const { catalog } = useSettingsCatalog();
 
   const [form, setForm] = useState<CandidateForm>({ ...EMPTY_CANDIDATE_FORM });
   const [resumeFile, setResumeFile] = useState<File | null>(null);
@@ -87,6 +89,23 @@ export default function CandidatesPage() {
     const prefix = session?.user?.email?.split("@")[0] ?? "Current User";
     return toTitleCase(prefix);
   }, [session]);
+
+  const candidateStatusOptions = useMemo(
+    () => (catalog.candidate_status.length > 0 ? catalog.candidate_status : ["new", "active", "on_hold"]),
+    [catalog.candidate_status],
+  );
+  const candidateEmployeeTypeOptions = useMemo(
+    () => (catalog.candidate_employee_type.length > 0 ? catalog.candidate_employee_type : ["full_time", "contract", "part_time"]),
+    [catalog.candidate_employee_type],
+  );
+  const candidateSourceOptions = useMemo(
+    () => (catalog.candidate_source.length > 0 ? catalog.candidate_source : ["manual", "referral", "portal"]),
+    [catalog.candidate_source],
+  );
+  const groupBuOptions = useMemo(
+    () => catalog.group_bu,
+    [catalog.group_bu],
+  );
 
   const { data, isLoading } = useQuery({
     queryKey: queryKeys.candidates.list(list.page, list.includeDeleted),
@@ -104,7 +123,7 @@ export default function CandidatesPage() {
     const search = list.normalizedSearch.toLowerCase();
     if (!search) return items;
     return items.filter((item) => {
-      const haystack = `${item.id} ${item.first_name} ${item.last_name} ${item.email ?? ""} ${item.phone ?? ""} ${item.current_company ?? ""}`.toLowerCase();
+      const haystack = `${item.id} ${item.first_name} ${item.last_name} ${item.email ?? ""} ${item.phone ?? ""} ${item.group_bu ?? ""} ${item.current_company ?? ""}`.toLowerCase();
       return haystack.includes(search);
     });
   }, [data?.items, list.normalizedSearch]);
@@ -147,12 +166,6 @@ export default function CandidatesPage() {
   const extractMutation = useMutation({
     mutationFn: extractResumePreview,
     onError: (err) => setError(getApiErrorMessage(err, "Failed to extract details from resume")),
-  });
-
-  const deleteMutation = useMutation({
-    mutationFn: deleteCandidate,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.candidates.all }),
-    onError: (err) => setError(getApiErrorMessage(err, "Failed to delete candidate")),
   });
 
   const restoreMutation = useMutation({
@@ -253,6 +266,7 @@ export default function CandidatesPage() {
         last_name: form.lastName.trim(),
         email: form.email1 || undefined,
         phone: form.primaryPhone || undefined,
+        group_bu: form.groupBu.trim() || undefined,
         current_company: matchedCompanyName,
       });
 
@@ -325,14 +339,23 @@ export default function CandidatesPage() {
                     Status <span className="text-red-600">*</span>
                   </label>
                   <Select className={LINE_INPUT_CLASS} value={form.status} onChange={(e) => onChangeField("status", e.target.value)}>
-                    <option value="new">New</option>
-                    <option value="active">Active</option>
-                    <option value="on_hold">On Hold</option>
+                    {candidateStatusOptions.map((option) => (
+                      <option key={option} value={option}>
+                        {toTitleCase(option.replace(/_/g, " "))}
+                      </option>
+                    ))}
                   </Select>
                 </div>
                 <div className={rowClass}>
                   <label className={labelClass}>Group (BU)</label>
-                  <Input className={LINE_INPUT_CLASS} value={form.groupBu} onChange={(e) => onChangeField("groupBu", e.target.value)} />
+                  <Select className={LINE_INPUT_CLASS} value={form.groupBu} onChange={(e) => onChangeField("groupBu", e.target.value)}>
+                    <option value="">{groupBuOptions.length > 0 ? "Select Group (BU)" : "No Group (BU) configured"}</option>
+                    {groupBuOptions.map((option) => (
+                      <option key={option} value={option}>
+                        {toTitleCase(option.replace(/_/g, " "))}
+                      </option>
+                    ))}
+                  </Select>
                 </div>
                 <div className={rowClass}>
                   <label className={labelClass}>BDM</label>
@@ -346,9 +369,6 @@ export default function CandidatesPage() {
                   <label className={labelClass}>Current Company</label>
                   <div>
                     <Input className={LINE_INPUT_CLASS} value={form.currentCompany} onChange={(e) => onChangeField("currentCompany", e.target.value)} />
-                    <p className="mt-1 text-xs text-slate-500">
-                      Exact client/vendor match will be linked automatically.
-                    </p>
                   </div>
                 </div>
                 <div className={rowClass}>
@@ -356,9 +376,11 @@ export default function CandidatesPage() {
                     Employee Type <span className="text-red-600">*</span>
                   </label>
                   <Select className={LINE_INPUT_CLASS} value={form.employeeType} onChange={(e) => onChangeField("employeeType", e.target.value)}>
-                    <option value="full_time">Full Time</option>
-                    <option value="contract">Contract</option>
-                    <option value="part_time">Part Time</option>
+                    {candidateEmployeeTypeOptions.map((option) => (
+                      <option key={option} value={option}>
+                        {toTitleCase(option.replace(/_/g, " "))}
+                      </option>
+                    ))}
                   </Select>
                 </div>
                 <div className={rowClass}>
@@ -366,9 +388,11 @@ export default function CandidatesPage() {
                     Source <span className="text-red-600">*</span>
                   </label>
                   <Select className={LINE_INPUT_CLASS} value={form.source} onChange={(e) => onChangeField("source", e.target.value)}>
-                    <option value="manual">Manual</option>
-                    <option value="referral">Referral</option>
-                    <option value="portal">Portal</option>
+                    {candidateSourceOptions.map((option) => (
+                      <option key={option} value={option}>
+                        {toTitleCase(option.replace(/_/g, " "))}
+                      </option>
+                    ))}
                   </Select>
                 </div>
                 <div className={rowClass}>
@@ -610,7 +634,7 @@ export default function CandidatesPage() {
     >
       <div className={cn("grid", previewCandidateId !== null ? "xl:grid-cols-[minmax(0,1fr)_36rem]" : "grid-cols-1")}>
         <div className="overflow-x-auto">
-          <table className="min-w-[980px] border-collapse text-left text-sm">
+          <table className="w-full min-w-[1120px] border-collapse text-left text-sm">
             <thead className="sticky top-0 z-10 bg-white">
               <tr className="border-b border-slate-300">
                 <th className="w-16 px-3 py-2">
@@ -619,6 +643,7 @@ export default function CandidatesPage() {
                 <th className="w-24 px-3 py-2 font-medium text-slate-900">ID</th>
                 <th className="px-3 py-2 font-medium text-slate-900">Candidate Name</th>
                 <th className="w-72 px-3 py-2 font-medium text-slate-900">Email</th>
+                <th className="w-64 px-3 py-2 font-medium text-slate-900">Group (BU)</th>
                 <th className="w-52 px-3 py-2 font-medium text-slate-900">Phone</th>
                 <th className="w-64 px-3 py-2 font-medium text-slate-900">Current Company</th>
                 <th className="w-44 px-3 py-2 font-medium text-slate-900">Actions</th>
@@ -626,11 +651,11 @@ export default function CandidatesPage() {
             </thead>
             <tbody>
               {isLoading ? (
-                <tr><td className="px-3 py-4 text-slate-600" colSpan={7}>Loading...</td></tr>
+                <tr><td className="px-3 py-4 text-slate-600" colSpan={8}>Loading...</td></tr>
               ) : null}
 
               {!isLoading && candidateItems.length === 0 ? (
-                <tr><td className="px-3 py-4 text-slate-600" colSpan={7}>No candidates found.</td></tr>
+                <tr><td className="px-3 py-4 text-slate-600" colSpan={8}>No candidates found.</td></tr>
               ) : null}
 
               {candidateItems.map((candidate, index) => (
@@ -672,6 +697,7 @@ export default function CandidatesPage() {
                     </Link>
                   </td>
                   <td className="px-3 py-2 text-slate-800">{candidate.email ?? "-"}</td>
+                  <td className="px-3 py-2 text-slate-800">{candidate.group_bu ?? "-"}</td>
                   <td className="px-3 py-2 text-slate-800">{candidate.phone ?? "-"}</td>
                   <td className="px-3 py-2 text-slate-800">{candidate.current_company ?? "-"}</td>
                   <td className="px-3 py-2">
@@ -679,9 +705,7 @@ export default function CandidatesPage() {
                       <Link href={`/candidates/${candidate.id}/resumes`} className="text-blue-700 hover:underline">Resumes</Link>
                       {candidate.deleted_at ? (
                         <Button variant="secondary" onClick={() => restoreMutation.mutate(candidate.id)}>Restore</Button>
-                      ) : (
-                        <Button variant="danger" onClick={() => deleteMutation.mutate(candidate.id)}>Delete</Button>
-                      )}
+                      ) : null}
                     </div>
                   </td>
                 </tr>
@@ -775,7 +799,7 @@ export default function CandidatesPage() {
                     </div>
                     <div>
                       <p className="text-xs font-semibold uppercase text-slate-500">Group (BU)</p>
-                      <p className="mt-1 text-2xl font-semibold text-slate-900">-</p>
+                      <p className="mt-1 text-2xl font-semibold text-slate-900">{previewCandidate?.group_bu ?? "-"}</p>
                     </div>
                     <div>
                       <p className="text-xs font-semibold uppercase text-slate-500">Email 1</p>

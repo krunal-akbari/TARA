@@ -6,18 +6,21 @@ import {
   BriefcaseBusiness,
   Building2,
   CircleHelp,
+  Handshake,
   LayoutDashboard,
   Menu,
   Plus,
   Search,
+  Settings,
   UsersRound,
   X,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { useAuthStore } from "@/lib/auth-store";
 import { getCandidate } from "@/lib/services/candidates";
+import { getClient } from "@/lib/services/clients";
 import { logout } from "@/lib/services/auth";
 import { cn } from "@/lib/utils/cn";
 
@@ -34,17 +37,32 @@ type OpenTab = {
   label: string;
 };
 
+type QuickAddItem = {
+  href: string;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  chipClass: string;
+};
+
 const appTiles: NavLink[] = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, chipClass: "bg-sky-500" },
   { href: "/clients", label: "Clients", icon: Building2, chipClass: "bg-blue-500" },
   { href: "/vendors", label: "Vendors", icon: Building2, chipClass: "bg-indigo-500" },
   { href: "/jobs", label: "Jobs", icon: BriefcaseBusiness, chipClass: "bg-rose-500" },
   { href: "/candidates", label: "Candidates", icon: UsersRound, chipClass: "bg-emerald-500" },
+  { href: "/settings/other", label: "Setting", icon: Settings, chipClass: "bg-slate-500" },
+];
+
+const quickAddItems: QuickAddItem[] = [
+  { href: "/clients", label: "Client", icon: Building2, chipClass: "bg-blue-500" },
+  { href: "/vendors", label: "Business Partner", icon: Handshake, chipClass: "bg-amber-500" },
+  { href: "/candidates", label: "Candidate", icon: UsersRound, chipClass: "bg-emerald-500" },
+  { href: "/jobs", label: "Job", icon: BriefcaseBusiness, chipClass: "bg-rose-500" },
 ];
 
 const TAB_STORAGE_KEY = "tara_open_tabs_v2";
 const LAST_PROTECTED_ROUTE_KEY = "tara_last_protected_route_v1";
-const PROTECTED_ROUTE_PREFIXES = ["/dashboard", "/clients", "/vendors", "/jobs", "/candidates", "/links", "/audit", "/reporting"];
+const PROTECTED_ROUTE_PREFIXES = ["/dashboard", "/clients", "/vendors", "/jobs", "/candidates", "/settings", "/links", "/audit", "/reporting"];
 
 function toTitleCase(value: string) {
   return value
@@ -100,8 +118,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   const [busy, setBusy] = useState(false);
   const [launcherOpen, setLauncherOpen] = useState(false);
+  const [quickAddOpen, setQuickAddOpen] = useState(false);
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [now, setNow] = useState<Date>(new Date());
   const [openTabs, setOpenTabs] = useState<OpenTab[]>([]);
+  const quickAddRef = useRef<HTMLDivElement | null>(null);
+  const profileMenuRef = useRef<HTMLDivElement | null>(null);
 
   const session = useAuthStore((state) => state.session);
   const clearSession = useAuthStore((state) => state.clearSession);
@@ -142,6 +164,59 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (window.innerWidth < 1024) setLauncherOpen(false);
   }, [pathname]);
+
+  useEffect(() => {
+    setQuickAddOpen(false);
+    setProfileMenuOpen(false);
+  }, [pathname]);
+
+  useEffect(() => {
+    if (!quickAddOpen) return;
+    const onPointerDown = (event: MouseEvent | TouchEvent) => {
+      if (!quickAddRef.current) return;
+      const target = event.target as Node | null;
+      if (target && !quickAddRef.current.contains(target)) {
+        setQuickAddOpen(false);
+      }
+    };
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setQuickAddOpen(false);
+    };
+
+    window.addEventListener("mousedown", onPointerDown);
+    window.addEventListener("touchstart", onPointerDown);
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      window.removeEventListener("mousedown", onPointerDown);
+      window.removeEventListener("touchstart", onPointerDown);
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [quickAddOpen]);
+
+  useEffect(() => {
+    if (!profileMenuOpen) return;
+    const onPointerDown = (event: MouseEvent | TouchEvent) => {
+      if (!profileMenuRef.current) return;
+      const target = event.target as Node | null;
+      if (target && !profileMenuRef.current.contains(target)) {
+        setProfileMenuOpen(false);
+      }
+    };
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setProfileMenuOpen(false);
+    };
+
+    window.addEventListener("mousedown", onPointerDown);
+    window.addEventListener("touchstart", onPointerDown);
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      window.removeEventListener("mousedown", onPointerDown);
+      window.removeEventListener("touchstart", onPointerDown);
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [profileMenuOpen]);
 
   useEffect(() => {
     try {
@@ -206,6 +281,30 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }, [pathname]);
 
   useEffect(() => {
+    const match = pathname.match(/^\/clients\/(\d+)(?:\/.*)?$/);
+    if (!match) return;
+    const clientId = Number(match[1]);
+    if (!Number.isInteger(clientId) || clientId <= 0) return;
+
+    let cancelled = false;
+    getClient(clientId, true)
+      .then((client) => {
+        if (cancelled) return;
+        const clientName = client.name?.trim() || `Client ${client.id}`;
+        setOpenTabs((prev) =>
+          prev.map((tab) => (tab.href === pathname ? { ...tab, label: clientName } : tab)),
+        );
+      })
+      .catch(() => {
+        // Keep default tab label if client lookup fails.
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [pathname]);
+
+  useEffect(() => {
     window.localStorage.setItem(TAB_STORAGE_KEY, JSON.stringify(openTabs));
   }, [openTabs]);
 
@@ -221,7 +320,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     (href: string) => {
       setOpenTabs((prev) => normalizeTabs([...prev, makeTab(href)]));
       router.push(href);
-      if (window.innerWidth < 1024) setLauncherOpen(false);
+      setLauncherOpen(false);
     },
     [router],
   );
@@ -252,7 +351,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
     setBusy(true);
     try {
-      await logout({ refresh_token: session.refreshToken });
+      await logout();
     } catch {
       // Ignore logout API failures because local cleanup is enough.
     } finally {
@@ -262,20 +361,84 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     }
   }, [session, busy, clearSession, router]);
 
+  const onQuickAddSelect = useCallback(
+    (href: string) => {
+      setQuickAddOpen(false);
+      setOpenTabs((prev) => normalizeTabs([...prev, makeTab(href)]));
+      router.push(href);
+      if (window.innerWidth < 1024) setLauncherOpen(false);
+    },
+    [router],
+  );
+
+  const onOpenSettings = useCallback(() => {
+    setProfileMenuOpen(false);
+    setOpenTabs((prev) => normalizeTabs([...prev, makeTab("/settings", "Settings")]));
+    router.push("/settings");
+    if (window.innerWidth < 1024) setLauncherOpen(false);
+  }, [router]);
+
   return (
     <div className="h-dvh overflow-hidden bg-slate-200 text-slate-900">
       <header className="flex h-14 items-center justify-between border-b border-slate-900 bg-[#1f2b52] px-3 text-white">
         <div className="flex items-center gap-4">
-          <Image src="/tara-logo.svg" alt="TARA logo" width={170} height={36} priority className="h-8 w-auto" />
+          <Image
+            src="/tara-logo.svg"
+            alt="TARA logo"
+            width={170}
+            height={36}
+            priority
+            className="h-8 w-auto brightness-0 invert"
+          />
 
           <button type="button" className="hidden items-center gap-2 rounded px-2 py-1 text-sm hover:bg-white/10 md:inline-flex">
             <Search className="size-4" />
             Find
           </button>
-          <button type="button" className="hidden items-center gap-2 rounded px-2 py-1 text-sm hover:bg-white/10 md:inline-flex">
-            <Plus className="size-4" />
-            Add
-          </button>
+          <div ref={quickAddRef} className="relative hidden md:block">
+            <button
+              type="button"
+              className={cn(
+                "inline-flex items-center gap-2 rounded px-2 py-1 text-sm hover:bg-white/10",
+                quickAddOpen && "bg-white/15",
+              )}
+              onClick={() => setQuickAddOpen((prev) => !prev)}
+              aria-haspopup="menu"
+              aria-expanded={quickAddOpen}
+              aria-label="Open add menu"
+            >
+              <Plus className="size-4" />
+              Add
+            </button>
+
+            {quickAddOpen ? (
+              <div className="absolute left-0 top-full z-50 mt-2 w-64 overflow-hidden rounded border border-slate-300 bg-white text-slate-900 shadow-xl">
+                <div className="flex items-center gap-2 bg-blue-500 px-3 py-2 text-base font-medium text-white">
+                  <Plus className="size-4" />
+                  Add
+                </div>
+                <div className="p-2">
+                  {quickAddItems.map((item) => {
+                    const Icon = item.icon;
+                    return (
+                      <button
+                        key={item.href}
+                        type="button"
+                        onClick={() => onQuickAddSelect(item.href)}
+                        className="flex w-full items-center gap-3 rounded px-2 py-2 text-left text-sm text-slate-700 hover:bg-slate-100"
+                        role="menuitem"
+                      >
+                        <span className={cn("grid size-7 place-items-center rounded-md text-white", item.chipClass)}>
+                          <Icon className="size-4" />
+                        </span>
+                        <span className="leading-none">{item.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : null}
+          </div>
         </div>
 
         <div className="flex items-center gap-3 text-sm">
@@ -285,9 +448,33 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             Help
           </a>
           <div className="h-5 w-px bg-white/25" />
-          <span className="hidden max-w-40 truncate md:inline">{displayName}</span>
-          <div className="grid size-7 place-items-center rounded-full bg-amber-400 text-xs font-semibold text-[#1f2b52]">
-            {getInitials(displayName)}
+          <div ref={profileMenuRef} className="relative">
+            <button
+              type="button"
+              onClick={() => setProfileMenuOpen((prev) => !prev)}
+              className="inline-flex items-center gap-2 rounded px-1 py-1 hover:bg-white/10"
+              aria-haspopup="menu"
+              aria-expanded={profileMenuOpen}
+              aria-label="Open profile menu"
+            >
+              <span className="hidden max-w-40 truncate md:inline">{displayName}</span>
+              <span className="grid size-7 place-items-center rounded-full bg-amber-400 text-xs font-semibold text-[#1f2b52]">
+                {getInitials(displayName)}
+              </span>
+            </button>
+            {profileMenuOpen ? (
+              <div className="absolute right-0 top-full z-50 mt-2 w-44 overflow-hidden rounded border border-slate-300 bg-white py-1 text-sm text-slate-900 shadow-xl">
+                <button
+                  type="button"
+                  onClick={onOpenSettings}
+                  className="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-slate-100"
+                  role="menuitem"
+                >
+                  <Settings className="size-4" />
+                  Settings
+                </button>
+              </div>
+            ) : null}
           </div>
           <Button variant="ghost" onClick={onLogout} disabled={busy} className="h-8 border-white/25 bg-white/10 text-white hover:bg-white/20">
             {busy ? "Signing out..." : "Logout"}
@@ -367,7 +554,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           ) : null}
         </aside>
 
-        <main className={cn("h-full overflow-y-auto p-4 md:p-6 lg:pl-40", launcherOpen && "lg:pl-[34rem]")}>
+        <main className={cn("h-full overflow-y-auto p-4 md:p-6 lg:pl-44", launcherOpen && "lg:pl-[35rem]")}>
           {showMainContent ? children : null}
         </main>
       </div>

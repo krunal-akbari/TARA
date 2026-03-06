@@ -16,6 +16,7 @@ interface ListPageShellProps {
   addButtonLabel: string;
   showCreate: boolean;
   onToggleCreate: () => void;
+  filters?: React.ReactNode;
   createForm?: React.ReactNode;
   error?: React.ReactNode;
   pagination: {
@@ -41,6 +42,7 @@ export function ListPageShell({
   addButtonLabel,
   showCreate,
   onToggleCreate,
+  filters,
   createForm,
   error,
   pagination,
@@ -62,6 +64,8 @@ export function ListPageShell({
             className="h-10"
           />
         </div>
+
+        {filters}
 
         <button type="button" className="inline-flex items-center gap-1 text-slate-600 hover:text-slate-800">
           <Columns3 className="size-4" />

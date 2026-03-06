@@ -55,10 +55,30 @@ export default function LoginPage() {
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    if (hydrated && session?.accessToken) {
+    if (hydrated && session) {
       router.replace(getPostLoginRoute());
     }
   }, [hydrated, session, router]);
+
+  useEffect(() => {
+    if (!hydrated || session) return;
+    let active = true;
+    me()
+      .then((current) => {
+        if (!active) return;
+        setSession({
+          tenantId: current.tenant_id,
+          user: current,
+        });
+        router.replace(getPostLoginRoute());
+      })
+      .catch(() => {
+        // Unauthenticated sessions stay on login page.
+      });
+    return () => {
+      active = false;
+    };
+  }, [hydrated, session, setSession, router]);
 
   const onSubmit = async (event: FormEvent) => {
     event.preventDefault();
@@ -66,19 +86,10 @@ export default function LoginPage() {
     setError(null);
 
     try {
-      const tokens = await login({ email, password });
-
-      setSession({
-        accessToken: tokens.access_token,
-        refreshToken: tokens.refresh_token,
-        tenantId: null,
-        user: null,
-      });
+      await login({ email, password });
 
       const current = await me();
       setSession({
-        accessToken: tokens.access_token,
-        refreshToken: tokens.refresh_token,
         tenantId: current.tenant_id,
         user: current,
       });

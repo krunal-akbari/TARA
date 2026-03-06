@@ -16,12 +16,12 @@ import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { getApiErrorMessage } from "@/lib/api/http";
 import { queryKeys } from "@/lib/query-keys";
-import { deleteJob, getJob, restoreJob, updateJob } from "@/lib/services/jobs";
+import { deleteJob, getJob, listJobApplications, restoreJob, updateJob } from "@/lib/services/jobs";
 import { JOB_INTAKE_CHANNELS } from "@/lib/types/forms";
 import { cn } from "@/lib/utils/cn";
 import { toTitleCase } from "@/lib/utils/format";
 
-type JobTabId = "overview" | "edit" | "routing";
+type JobTabId = "overview" | "edit" | "applicants";
 
 function toLabel(value: string) {
   return toTitleCase(value.replaceAll("_", " "));
@@ -47,6 +47,12 @@ export default function JobDetailPage() {
     enabled: hasValidId,
   });
 
+  const { data: applicationsData, isLoading: applicationsLoading } = useQuery({
+    queryKey: queryKeys.jobs.applications(id, 1),
+    queryFn: () => listJobApplications(id, { page: 1, pageSize: 100 }),
+    enabled: hasValidId,
+  });
+
   useEffect(() => {
     if (!data) return;
     setTitle(data.title);
@@ -54,6 +60,13 @@ export default function JobDetailPage() {
     setStatus(data.status);
     setChannel(data.intake_channel);
   }, [data]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (window.location.hash === "#applied-candidates") {
+      setActiveTab("applicants");
+    }
+  }, []);
 
   const updateMutation = useMutation({
     mutationFn: () => updateJob(id, { title: title.trim(), description, status, intake_channel: channel }),
@@ -90,12 +103,13 @@ export default function JobDetailPage() {
     () => [
       { id: "overview" as const, label: "Overview" },
       { id: "edit" as const, label: "Edit" },
-      { id: "routing" as const, label: "Routing" },
+      { id: "applicants" as const, label: "Applicants" },
     ],
     [],
   );
 
   const statusLabel = data?.deleted_at ? "Deleted" : data ? toLabel(data.status) : "-";
+  const applicantsCount = applicationsData?.total ?? data?.applications_count ?? 0;
 
   if (!hasValidId) {
     return <ErrorBanner message="Invalid job id." />;
@@ -125,7 +139,7 @@ export default function JobDetailPage() {
                 <StatusChip value={statusLabel} />
               </div>
 
-              <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
+              <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-7">
                 <div>
                   <p className="text-xs font-medium text-slate-500">ID</p>
                   <p className="mt-1 tabular-nums text-slate-900">{data.id}</p>
@@ -149,6 +163,10 @@ export default function JobDetailPage() {
                 <div>
                   <p className="text-xs font-medium text-slate-500">Origin Vendor</p>
                   <p className="mt-1 tabular-nums text-slate-900">{data.origin_vendor_id ?? "-"}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-slate-500">Applicants</p>
+                  <p className="mt-1 tabular-nums text-slate-900">{applicantsCount}</p>
                 </div>
               </div>
             </div>
@@ -181,7 +199,7 @@ export default function JobDetailPage() {
                 <div className="grid gap-0 text-sm">
                   <div className="grid grid-cols-2 border-b border-slate-200 px-3 py-2"><span className="text-slate-700">Owner</span><span className="tabular-nums text-slate-900">{data.owner_user_id}</span></div>
                   <div className="grid grid-cols-2 border-b border-slate-200 px-3 py-2"><span className="text-slate-700">Deleted At</span><span className="text-slate-900">{data.deleted_at || "-"}</span></div>
-                  <div className="grid grid-cols-2 px-3 py-2"><span className="text-slate-700">Routing</span><span><Link href={`/jobs/${id}/routing`} className="text-blue-700 hover:underline">Open routing history</Link></span></div>
+                  <div className="grid grid-cols-2 px-3 py-2"><span className="text-slate-700">Applied Candidates</span><span className="tabular-nums text-slate-900">{applicantsCount}</span></div>
                 </div>
               </Card>
 
@@ -191,7 +209,32 @@ export default function JobDetailPage() {
                   {data.description || "No description provided."}
                 </p>
               </Card>
+
             </div>
+          ) : null}
+
+          {activeTab === "applicants" ? (
+            <Card id="applied-candidates" className="overflow-hidden p-0">
+              <div className="border-b border-slate-200 px-3 py-2 text-sm font-semibold text-slate-900">Applicants</div>
+              {applicationsLoading ? (
+                <p className="px-3 py-3 text-sm text-slate-600">Loading applicants...</p>
+              ) : null}
+              {!applicationsLoading && (applicationsData?.items?.length ?? 0) === 0 ? (
+                <p className="px-3 py-3 text-sm text-slate-600">No candidates applied to this job yet.</p>
+              ) : null}
+              {!applicationsLoading && (applicationsData?.items?.length ?? 0) > 0 ? (
+                <div className="divide-y divide-slate-200">
+                  {(applicationsData?.items ?? []).map((application) => (
+                    <div key={application.id} className="flex items-center justify-between px-3 py-2 text-sm">
+                      <Link href={`/candidates/${application.candidate_id}`} className="font-medium text-blue-700 hover:underline">
+                        {application.candidate_name}
+                      </Link>
+                      <span className="text-xs uppercase tracking-wide text-slate-500">{application.status}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+            </Card>
           ) : null}
 
           {activeTab === "edit" ? (
@@ -234,22 +277,6 @@ export default function JobDetailPage() {
             </Card>
           ) : null}
 
-          {activeTab === "routing" ? (
-            <Card className="space-y-3">
-              <h2 className="text-lg font-semibold text-slate-900">Routing</h2>
-              <p className="text-sm text-slate-600">
-                Open immutable route transitions and current route state for this job.
-              </p>
-              <div>
-                <Link
-                  href={`/jobs/${id}/routing`}
-                  className="inline-flex items-center rounded border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50"
-                >
-                  Open Routing
-                </Link>
-              </div>
-            </Card>
-          ) : null}
         </>
       ) : null}
     </div>

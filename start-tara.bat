@@ -15,16 +15,21 @@ if errorlevel 1 (
     exit /b 1
 )
 
-REM Check if docker-compose is available
-docker-compose --version >nul 2>&1
+REM Resolve compose command (prefer modern 'docker compose', fallback to 'docker-compose')
+set "COMPOSE_CMD=docker compose"
+docker compose version >nul 2>&1
 if errorlevel 1 (
-    echo Error: docker-compose is not installed or not in PATH.
-    exit /b 1
+    docker-compose --version >nul 2>&1
+    if errorlevel 1 (
+        echo Error: Docker Compose is not available. Please install/update Docker Desktop.
+        exit /b 1
+    )
+    set "COMPOSE_CMD=docker-compose"
 )
 
-REM Check if backend .env exists
-if not exist "TARA - backend\.env" (
-    echo Warning: Backend .env file not found at 'TARA - backend\.env'
+REM Check if backend .env.local exists
+if not exist "TARA - backend\.env.local" (
+    echo Warning: Backend .env.local file not found at 'TARA - backend\.env.local'
     echo          Please create it before starting the application.
     echo.
     set /p CONTINUE="Continue anyway? (y/N): "
@@ -61,17 +66,17 @@ exit /b 1
 echo Starting all services in foreground mode...
 echo Press Ctrl+C to stop all services
 echo.
-docker-compose up
+%COMPOSE_CMD% up
 goto :end
 
 :background
 echo Starting all services in background mode...
-docker-compose up -d
+%COMPOSE_CMD% up -d
 echo.
 echo Services started successfully!
 echo.
 echo Service Status:
-docker-compose ps
+%COMPOSE_CMD% ps
 echo.
 echo Access URLs:
 echo    Frontend:  http://localhost:3000
@@ -79,41 +84,41 @@ echo    Backend:   http://localhost:8000
 echo    API Docs:  http://localhost:8000/docs
 echo.
 echo Useful Commands:
-echo    docker-compose logs -f           # View all logs
-echo    docker-compose logs -f api       # View API logs
-echo    docker-compose logs -f frontend  # View frontend logs
-echo    docker-compose ps                # Check service status
-echo    docker-compose down              # Stop all services
+echo    docker compose logs -f           # View all logs
+echo    docker compose logs -f api       # View API logs
+echo    docker compose logs -f frontend  # View frontend logs
+echo    docker compose ps                # Check service status
+echo    docker compose down              # Stop all services
 echo.
 goto :end
 
 :stop
 echo Stopping all services...
-docker-compose down
+%COMPOSE_CMD% down
 echo All services stopped
 goto :end
 
 :restart
 echo Restarting all services...
-docker-compose restart
+%COMPOSE_CMD% restart
 echo All services restarted
 goto :end
 
 :logs
 echo Showing logs (press Ctrl+C to exit)...
-docker-compose logs -f
+%COMPOSE_CMD% logs -f
 goto :end
 
 :status
 echo Service Status:
-docker-compose ps
+%COMPOSE_CMD% ps
 goto :end
 
 :clean
 echo Cleaning up containers and volumes...
 set /p CONFIRM="This will remove all data. Are you sure? (y/N): "
 if /i "!CONFIRM!"=="y" (
-    docker-compose down -v
+    %COMPOSE_CMD% down -v
     echo Cleanup complete
 ) else (
     echo Cleanup cancelled
@@ -122,7 +127,7 @@ goto :end
 
 :rebuild
 echo Rebuilding all services...
-docker-compose build --no-cache
+%COMPOSE_CMD% build --no-cache
 echo Rebuild complete
 goto :end
 
