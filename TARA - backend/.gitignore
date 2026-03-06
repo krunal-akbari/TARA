@@ -2,6 +2,7 @@ __pycache__/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+.claude/
 .venv/
 *.env.local
 .env.local
@@ -14,6 +15,7 @@ htmlcov/
 build/
 dist/
 *.egg-info/
+storage/
 test_storage/
 test_tara.db
 tara.db
