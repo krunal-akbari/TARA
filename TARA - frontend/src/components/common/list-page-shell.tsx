@@ -1,7 +1,5 @@
 "use client";
 
-import { ChevronDown, Columns3, Star, User } from "lucide-react";
-
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -17,6 +15,7 @@ interface ListPageShellProps {
   showCreate: boolean;
   onToggleCreate: () => void;
   filters?: React.ReactNode;
+  headerActions?: React.ReactNode;
   createForm?: React.ReactNode;
   error?: React.ReactNode;
   pagination: {
@@ -43,14 +42,15 @@ export function ListPageShell({
   showCreate,
   onToggleCreate,
   filters,
+  headerActions,
   createForm,
   error,
   pagination,
   children,
 }: ListPageShellProps) {
   return (
-    <div className="overflow-hidden rounded border border-slate-300 bg-white">
-      <div className="flex flex-wrap items-center gap-3 border-b border-slate-300 bg-white px-3 py-2">
+    <div className="overflow-visible rounded border border-slate-300 bg-white">
+      <div className="relative z-30 flex flex-wrap items-center gap-3 overflow-visible border-b border-slate-300 bg-white px-3 py-2">
         <div className="flex items-center gap-2 text-2xl font-semibold text-slate-900">
           {icon}
           <span className="text-balance text-[32px]">{title}</span>
@@ -67,23 +67,8 @@ export function ListPageShell({
 
         {filters}
 
-        <button type="button" className="inline-flex items-center gap-1 text-slate-600 hover:text-slate-800">
-          <Columns3 className="size-4" />
-          <span>Columns</span>
-          <ChevronDown className="size-3" />
-        </button>
-        <button type="button" className="inline-flex items-center gap-1 text-slate-600 hover:text-slate-800">
-          <User className="size-4" />
-          <span>Users</span>
-          <ChevronDown className="size-3" />
-        </button>
-        <button type="button" className="inline-flex items-center gap-1 text-slate-600 hover:text-slate-800">
-          <Star className="size-4" />
-          <span>Favorites</span>
-          <ChevronDown className="size-3" />
-        </button>
-
         <div className="ml-auto flex items-center gap-2">
+          {headerActions}
           {showIncludeDeleted ? (
             <label className="flex items-center gap-2 text-sm text-slate-600">
               <input

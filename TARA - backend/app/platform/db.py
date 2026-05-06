@@ -40,6 +40,7 @@ def init_db() -> None:
     _ensure_jobs_priority_column()
     _ensure_candidate_hr_notes_columns()
     _ensure_candidate_group_bu_column()
+    _ensure_tenant_resume_upload_limit_column()
 
 
 def _ensure_jobs_priority_column() -> None:
@@ -100,3 +101,16 @@ def _ensure_candidate_group_bu_column() -> None:
 
     with engine.begin() as connection:
         connection.execute(text("ALTER TABLE candidates ADD COLUMN group_bu VARCHAR(255)"))
+
+
+def _ensure_tenant_resume_upload_limit_column() -> None:
+    inspector = inspect(engine)
+    if not inspector.has_table("tenants"):
+        return
+
+    tenant_columns = {column["name"] for column in inspector.get_columns("tenants")}
+    if "resume_upload_max_bytes" in tenant_columns:
+        return
+
+    with engine.begin() as connection:
+        connection.execute(text("ALTER TABLE tenants ADD COLUMN resume_upload_max_bytes INTEGER"))

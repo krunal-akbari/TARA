@@ -14,12 +14,10 @@ from app.domains.vendors.schemas import (
 from app.domains.vendors.service import (
     create_vendor,
     create_vendor_contact,
-    delete_vendor_contact,
     get_vendor,
     list_vendor_contacts,
     list_vendors,
     restore_vendor,
-    soft_delete_vendor,
     update_vendor,
     update_vendor_contact,
 )
@@ -131,27 +129,13 @@ def update_vendor_endpoint(
     return _to_response(updated)
 
 
-@router.delete("/{vendor_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{vendor_id}", status_code=status.HTTP_405_METHOD_NOT_ALLOWED)
 def delete_vendor_endpoint(
     vendor_id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-    roles: list[str] = Depends(get_current_roles),
+    _: User = Depends(get_current_user),
 ) -> None:
-    vendor = get_vendor(db=db, tenant_id=current_user.tenant_id, vendor_id=vendor_id)
-    if not vendor:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Vendor not found")
-    try:
-        soft_delete_vendor(
-            db=db,
-            tenant_id=current_user.tenant_id,
-            actor_user_id=current_user.id,
-            roles=roles,
-            vendor=vendor,
-        )
-    except PermissionError as exc:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
-    return None
+    _ = vendor_id
+    raise HTTPException(status_code=status.HTTP_405_METHOD_NOT_ALLOWED, detail="Deletion is disabled")
 
 
 @router.post("/{vendor_id}/restore", response_model=VendorResponse)
@@ -267,25 +251,11 @@ def update_vendor_contact_endpoint(
     return _contact_to_response(contact)
 
 
-@router.delete("/{vendor_id}/contacts/{contact_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{vendor_id}/contacts/{contact_id}", status_code=status.HTTP_405_METHOD_NOT_ALLOWED)
 def delete_vendor_contact_endpoint(
     vendor_id: int,
     contact_id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-    roles: list[str] = Depends(get_current_roles),
+    _: User = Depends(get_current_user),
 ) -> None:
-    try:
-        delete_vendor_contact(
-            db=db,
-            tenant_id=current_user.tenant_id,
-            vendor_id=vendor_id,
-            contact_id=contact_id,
-            actor_user_id=current_user.id,
-            roles=roles,
-        )
-    except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
-    except PermissionError as exc:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
-    return None
+    _ = (vendor_id, contact_id)
+    raise HTTPException(status_code=status.HTTP_405_METHOD_NOT_ALLOWED, detail="Deletion is disabled")

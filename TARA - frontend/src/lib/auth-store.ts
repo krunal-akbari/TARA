@@ -7,8 +7,8 @@ interface AuthState {
   session: AuthSession | null;
   hydrated: boolean;
   hydrate: () => void;
-  setSession: (session: AuthSession) => void;
-  setUser: (user: UserResponse) => void;
+  setSession: (_session: AuthSession) => void;
+  setUser: (_user: UserResponse) => void;
   clearSession: () => void;
 }
 

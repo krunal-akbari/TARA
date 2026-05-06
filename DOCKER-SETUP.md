@@ -24,6 +24,26 @@ docker-compose down
 docker-compose down -v
 ```
 
+## Run Published Images from Docker Hub
+
+Use this on another machine when you only want to pull and run the published images:
+
+```bash
+curl -L -o docker-compose.yml https://raw.githubusercontent.com/krunal-akbari/TARA/main/docker-compose.hub.yml
+docker compose up -d
+```
+
+Published application images:
+- `krunalakbari/tara-api:latest`
+- `krunalakbari/tara-frontend:latest`
+
+Then open:
+- Frontend: http://localhost:3000
+- Backend API: http://localhost:8000
+- API Docs: http://localhost:8000/docs
+
+The Docker Hub compose file does not bind-mount source code, so it can run on a different machine without cloning this repository. Data is stored in Docker named volumes.
+
 ## Services
 
 The setup includes 6 services running in a shared Docker network:
@@ -92,7 +112,7 @@ Key networking changes from individual setups:
 
 ## Environment Variables
 
-### Backend (.env in TARA - backend/)
+### Backend (`.env` or `.env.local` in `TARA - backend/`)
 Ensure your backend `.env` file contains:
 - Database connection settings (should point to service name `db`)
 - Redis connection settings (should point to service name `redis`)
@@ -114,7 +134,7 @@ You can override defaults via environment variables:
 1. Ensure backend `.env` file exists:
    ```bash
    cd "TARA - backend"
-   # Create .env from template if needed
+   cp .env.example .env
    ```
 
 2. Start all services:

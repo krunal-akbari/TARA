@@ -135,7 +135,7 @@ def test_update_vendor_contact(client):
     assert r.json()["phone"] == "222-222"
 
 
-def test_delete_vendor_contact(client):
+def test_delete_vendor_contact_is_disabled(client):
     h, vendor_id, _ = _setup(client)
     create = client.post(
         f"/api/v1/vendors/{vendor_id}/contacts",
@@ -145,12 +145,14 @@ def test_delete_vendor_contact(client):
     contact_id = create.json()["id"]
 
     r = client.delete(f"/api/v1/vendors/{vendor_id}/contacts/{contact_id}", headers=h)
-    assert r.status_code == 204
+    assert r.status_code == 405
+    assert r.json()["detail"] == "Deletion is disabled"
 
-    # Verify gone from list
+    # Verify record is still present
     contacts = client.get(f"/api/v1/vendors/{vendor_id}/contacts", headers=h)
     assert contacts.status_code == 200
-    assert len(contacts.json()) == 0
+    assert len(contacts.json()) == 1
+    assert contacts.json()[0]["id"] == contact_id
 
 
 def test_vendor_contact_requires_valid_vendor(client):
@@ -201,11 +203,11 @@ def test_vendor_contact_update_and_delete_require_matching_vendor_path(client):
         f"/api/v1/vendors/{vendor_2['id']}/contacts/{contact['id']}",
         headers=h,
     )
-    assert wrong_delete.status_code == 404
+    assert wrong_delete.status_code == 405
 
 
-def test_vendor_contact_permissions_still_apply_when_parent_vendor_soft_deleted(client):
-    tenant_id, _ = bootstrap_tenant(client, "VendorPermDeletedParent")
+def test_vendor_contact_permissions_still_apply_when_parent_vendor_deletion_is_disabled(client):
+    tenant_id, _ = bootstrap_tenant(client, "VendorPermDeletionDisabled")
     admin_h = auth_header(login(client))
     _create_recruiter_user(tenant_id=tenant_id)
     recruiter_h = auth_header(login(client, "recruiter@example.com"))
@@ -230,11 +232,11 @@ def test_vendor_contact_permissions_still_apply_when_parent_vendor_soft_deleted(
     assert active_update.status_code == 403
 
     delete_vendor = client.delete(f"/api/v1/vendors/{owner_vendor['id']}", headers=admin_h)
-    assert delete_vendor.status_code == 204
+    assert delete_vendor.status_code == 405
 
-    after_delete_update = client.patch(
+    after_delete_attempt_update = client.patch(
         f"/api/v1/vendors/{owner_vendor['id']}/contacts/{contact['id']}",
         headers=recruiter_h,
         json={"first_name": "StillNoAccess"},
     )
-    assert after_delete_update.status_code == 403
+    assert after_delete_attempt_update.status_code == 403

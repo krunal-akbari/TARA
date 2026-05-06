@@ -58,6 +58,7 @@ export interface Job {
   title: string;
   description: string;
   status: string;
+  priority: string;
   intake_channel: string;
   origin_client_id: number | null;
   origin_vendor_id: number | null;

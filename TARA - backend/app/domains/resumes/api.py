@@ -7,18 +7,19 @@ from app.domains.auth.models import User
 from app.domains.resumes.schemas import ResumeExtractResponse, ResumeListResponse, ResumeResponse, ResumeTextPreviewResponse
 from app.domains.resumes.service import (
     create_resume,
+    enqueue_resume_processing,
     extract_candidate_fields_from_resume,
+    get_resume,
     get_resume_content,
     get_resume_preview_text,
     list_resumes,
 )
+from app.domains.tenancy.service import get_effective_resume_upload_max_bytes_for_tenant
 from app.platform.db import get_db
 from app.platform.dependencies import get_current_user
-from app.platform.settings import get_settings
 
 router = APIRouter(prefix="/candidates/{candidate_id}/resumes", tags=["Resumes"])
 extract_router = APIRouter(prefix="/resumes", tags=["Resumes"])
-settings = get_settings()
 
 
 def _to_response(resume) -> ResumeResponse:
@@ -44,12 +45,13 @@ async def upload_resume_endpoint(
     current_user: User = Depends(get_current_user),
 ) -> ResumeResponse:
     body = await file.read()
+    max_upload_bytes = get_effective_resume_upload_max_bytes_for_tenant(db=db, tenant_id=current_user.tenant_id)
     if not body:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Empty upload")
-    if len(body) > settings.max_resume_upload_bytes:
+    if len(body) > max_upload_bytes:
         raise HTTPException(
             status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-            detail=f"File exceeds max upload size ({settings.max_resume_upload_bytes} bytes)",
+            detail=f"File exceeds max upload size ({max_upload_bytes} bytes)",
         )
     try:
         resume = create_resume(
@@ -71,16 +73,17 @@ async def upload_resume_endpoint(
 @extract_router.post("/extract-preview", response_model=ResumeExtractResponse)
 async def extract_resume_preview_endpoint(
     file: UploadFile = File(...),
+    db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> ResumeExtractResponse:
-    _ = current_user
+    max_upload_bytes = get_effective_resume_upload_max_bytes_for_tenant(db=db, tenant_id=current_user.tenant_id)
     body = await file.read()
     if not body:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Empty upload")
-    if len(body) > settings.max_resume_upload_bytes:
+    if len(body) > max_upload_bytes:
         raise HTTPException(
             status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-            detail=f"File exceeds max upload size ({settings.max_resume_upload_bytes} bytes)",
+            detail=f"File exceeds max upload size ({max_upload_bytes} bytes)",
         )
 
     try:
@@ -158,3 +161,35 @@ def get_resume_preview_text_endpoint(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
     return ResumeTextPreviewResponse(text=text)
+
+
+@router.post("/{resume_id}/retry-parse", response_model=ResumeResponse)
+def retry_resume_parse_endpoint(
+    candidate_id: int,
+    resume_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> ResumeResponse:
+    resume = get_resume(
+        db=db,
+        tenant_id=current_user.tenant_id,
+        candidate_id=candidate_id,
+        resume_id=resume_id,
+    )
+    if not resume:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Resume not found")
+
+    resume.parse_status = "pending"
+    db.commit()
+    db.refresh(resume)
+
+    if not enqueue_resume_processing(resume.id):
+        resume.parse_status = "failed"
+        db.commit()
+        db.refresh(resume)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Resume parse retry could not be queued",
+        )
+
+    return _to_response(resume)

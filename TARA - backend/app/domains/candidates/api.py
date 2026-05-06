@@ -15,7 +15,6 @@ from app.domains.candidates.service import (
     get_candidate,
     list_candidates,
     restore_candidate,
-    soft_delete_candidate,
     update_candidate,
 )
 from app.platform.db import get_db
@@ -134,27 +133,13 @@ def update_candidate_endpoint(
     return _to_response(updated)
 
 
-@router.delete("/{candidate_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{candidate_id}", status_code=status.HTTP_405_METHOD_NOT_ALLOWED)
 def delete_candidate_endpoint(
     candidate_id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-    roles: list[str] = Depends(get_current_roles),
+    _: User = Depends(get_current_user),
 ) -> None:
-    candidate = get_candidate(db=db, tenant_id=current_user.tenant_id, candidate_id=candidate_id)
-    if not candidate:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Candidate not found")
-    try:
-        soft_delete_candidate(
-            db=db,
-            tenant_id=current_user.tenant_id,
-            actor_user_id=current_user.id,
-            roles=roles,
-            candidate=candidate,
-        )
-    except PermissionError as exc:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
-    return None
+    _ = candidate_id
+    raise HTTPException(status_code=status.HTTP_405_METHOD_NOT_ALLOWED, detail="Deletion is disabled")
 
 
 @router.post("/{candidate_id}/restore", response_model=CandidateResponse)

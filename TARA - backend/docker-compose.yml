@@ -50,7 +50,10 @@ services:
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
     user: "0:0"
     env_file:
-      - .env.local
+      - path: .env
+        required: false
+      - path: .env.local
+        required: false
     environment:
       DATABASE_URL: sqlite:////var/lib/tara/tara.db
       LOCAL_STORAGE_PATH: /var/lib/tara/storage
@@ -81,7 +84,10 @@ services:
     command: celery -A app.tasks.celery_app.celery_app worker --loglevel=info --concurrency=4 -Q resume_ingest,routing_events,notifications
     user: "0:0"
     env_file:
-      - .env.local
+      - path: .env
+        required: false
+      - path: .env.local
+        required: false
     environment:
       DATABASE_URL: sqlite:////var/lib/tara/tara.db
       LOCAL_STORAGE_PATH: /var/lib/tara/storage

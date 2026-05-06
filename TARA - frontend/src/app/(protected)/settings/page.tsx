@@ -1,8 +1,8 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Settings, UserPlus, Users } from "lucide-react";
+import { Eye, EyeOff, Settings, UserPlus, Users } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -11,9 +11,10 @@ import { Label } from "@/components/ui/label";
 import { getApiErrorMessage } from "@/lib/api/http";
 import { useAuthStore } from "@/lib/auth-store";
 import { queryKeys } from "@/lib/query-keys";
+import { getTenantResumeUploadSettings, updateTenantResumeUploadSettings } from "@/lib/services/tenancy";
 import { createUser, listUsers } from "@/lib/services/users";
 
-type SettingsTab = "profile" | "users";
+type SettingsTab = "profile" | "tenant" | "users";
 type UserRole = "hr" | "recruiter" | "manager" | "admin";
 
 const ROLE_OPTIONS: Array<{ value: UserRole; label: string }> = [
@@ -29,9 +30,11 @@ function isValidEmail(email: string) {
 
 function generateTempPassword() {
   const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789!@#$%";
+  const randomValues = new Uint32Array(12);
+  crypto.getRandomValues(randomValues);
   let output = "";
   for (let index = 0; index < 12; index += 1) {
-    output += alphabet[Math.floor(Math.random() * alphabet.length)];
+    output += alphabet[randomValues[index] % alphabet.length];
   }
   return output;
 }
@@ -50,7 +53,10 @@ export default function SettingsPage() {
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<UserRole>("hr");
   const [temporaryPassword, setTemporaryPassword] = useState(generateTempPassword);
+  const [showPassword, setShowPassword] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [resumeUploadLimitMb, setResumeUploadLimitMb] = useState("");
+  const [tenantSettingsFeedback, setTenantSettingsFeedback] = useState<string | null>(null);
 
   const usersQuery = useQuery({
     queryKey: queryKeys.users.list(1, false, ""),
@@ -58,10 +64,23 @@ export default function SettingsPage() {
     enabled: activeTab === "users" && isAdmin,
   });
 
+  const tenantResumeUploadSettingsQuery = useQuery({
+    queryKey: queryKeys.tenancy.resumeUploadSettings,
+    queryFn: getTenantResumeUploadSettings,
+    enabled: activeTab === "tenant" && isAdmin,
+  });
+
   const createUserMutation = useMutation({
     mutationFn: createUser,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.users.all });
+    },
+  });
+
+  const updateTenantResumeUploadSettingsMutation = useMutation({
+    mutationFn: updateTenantResumeUploadSettings,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.tenancy.resumeUploadSettings });
     },
   });
 
@@ -77,6 +96,11 @@ export default function SettingsPage() {
       return lastA.localeCompare(lastB);
     });
   }, [usersQuery.data?.items]);
+
+  useEffect(() => {
+    if (!tenantResumeUploadSettingsQuery.data) return;
+    setResumeUploadLimitMb(String(tenantResumeUploadSettingsQuery.data.bulk_parse_resume_limit_mb));
+  }, [tenantResumeUploadSettingsQuery.data]);
 
   const onSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -111,7 +135,7 @@ export default function SettingsPage() {
         role,
       })
       .then(() => {
-        setFeedback(`${normalizedFirst} ${normalizedLast} added as ${role.toUpperCase()}. Temporary password: ${temporaryPassword.trim()}`);
+        setFeedback(`User added. Copy the temporary password before closing.`);
         setFirstName("");
         setLastName("");
         setEmail("");
@@ -120,6 +144,44 @@ export default function SettingsPage() {
       })
       .catch((err) => {
         setFeedback(getApiErrorMessage(err, "Failed to create user"));
+      });
+  };
+
+  const onTenantSettingsSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const normalized = resumeUploadLimitMb.trim();
+
+    if (!normalized) {
+      setTenantSettingsFeedback("Enter a limit in MB.");
+      return;
+    }
+
+    const parsed = Number(normalized);
+    if (!Number.isInteger(parsed) || parsed < 1 || parsed > 100) {
+      setTenantSettingsFeedback("Resume upload limit must be a whole number between 1 and 100 MB.");
+      return;
+    }
+
+    updateTenantResumeUploadSettingsMutation
+      .mutateAsync({ bulk_parse_resume_limit_mb: parsed })
+      .then((result) => {
+        setResumeUploadLimitMb(String(result.bulk_parse_resume_limit_mb));
+        setTenantSettingsFeedback(`Bulk parse limit updated to ${result.bulk_parse_resume_limit_mb} MB.`);
+      })
+      .catch((err) => {
+        setTenantSettingsFeedback(getApiErrorMessage(err, "Failed to update resume upload limit"));
+      });
+  };
+
+  const onResetTenantSettings = () => {
+    updateTenantResumeUploadSettingsMutation
+      .mutateAsync({ bulk_parse_resume_limit_mb: null })
+      .then((result) => {
+        setResumeUploadLimitMb(String(result.bulk_parse_resume_limit_mb));
+        setTenantSettingsFeedback(`Using system default limit of ${result.bulk_parse_resume_limit_mb} MB.`);
+      })
+      .catch((err) => {
+        setTenantSettingsFeedback(getApiErrorMessage(err, "Failed to reset resume upload limit"));
       });
   };
 
@@ -140,6 +202,15 @@ export default function SettingsPage() {
           >
             Profile
           </Button>
+          {isAdmin ? (
+            <Button
+              type="button"
+              variant={activeTab === "tenant" ? "primary" : "ghost"}
+              onClick={() => setActiveTab("tenant")}
+            >
+              Tenant
+            </Button>
+          ) : null}
           {isAdmin ? (
             <Button
               type="button"
@@ -165,6 +236,67 @@ export default function SettingsPage() {
               <p className="text-sm text-slate-900">{session?.user?.email ?? "-"}</p>
             </div>
           </div>
+        </Card>
+      ) : null}
+
+      {activeTab === "tenant" && isAdmin ? (
+        <Card className="rounded-lg border-slate-300 bg-white px-5 py-4 shadow-none">
+          <div className="mb-4 flex items-center gap-2 border-b border-slate-200 pb-3">
+            <Settings className="size-5 text-slate-700" />
+            <h2 className="text-xl font-semibold text-slate-900">Tenant Settings</h2>
+          </div>
+
+          {tenantResumeUploadSettingsQuery.isLoading ? (
+            <p className="text-sm text-slate-600">Loading tenant settings...</p>
+          ) : (
+            <form onSubmit={onTenantSettingsSubmit} className="space-y-4">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="rounded border border-slate-200 px-3 py-2">
+                  <p className="text-xs text-slate-500">Tenant</p>
+                  <p className="text-sm text-slate-900">{tenantResumeUploadSettingsQuery.data?.tenant_name ?? "-"}</p>
+                </div>
+                <div className="rounded border border-slate-200 px-3 py-2">
+                  <p className="text-xs text-slate-500">Current Mode</p>
+                  <p className="text-sm text-slate-900">
+                    {tenantResumeUploadSettingsQuery.data?.uses_system_default ? "System Default" : "Tenant Override"}
+                  </p>
+                </div>
+              </div>
+
+              <div className="max-w-sm space-y-1">
+                <Label htmlFor="resume-upload-limit-mb">Bulk Parse Resume Limit (MB)</Label>
+                <Input
+                  id="resume-upload-limit-mb"
+                  type="number"
+                  min={1}
+                  max={100}
+                  step={1}
+                  value={resumeUploadLimitMb}
+                  onChange={(event) => setResumeUploadLimitMb(event.target.value)}
+                  placeholder="10"
+                />
+                <p className="text-xs text-slate-500">
+                  This limit applies per resume file during bulk parse and manual resume upload.
+                </p>
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                <Button type="submit" disabled={updateTenantResumeUploadSettingsMutation.isPending}>
+                  {updateTenantResumeUploadSettingsMutation.isPending ? "Saving..." : "Save Limit"}
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  disabled={updateTenantResumeUploadSettingsMutation.isPending}
+                  onClick={onResetTenantSettings}
+                >
+                  Use System Default
+                </Button>
+              </div>
+
+              {tenantSettingsFeedback ? <p className="text-sm text-slate-700">{tenantSettingsFeedback}</p> : null}
+            </form>
+          )}
         </Card>
       ) : null}
 
@@ -222,12 +354,25 @@ export default function SettingsPage() {
               </div>
               <div className="space-y-1">
                 <Label htmlFor="user-temp-password">Temporary Password</Label>
-                <Input
-                  id="user-temp-password"
-                  value={temporaryPassword}
-                  onChange={(event) => setTemporaryPassword(event.target.value)}
-                  placeholder="Temporary password"
-                />
+                <div className="relative">
+                  <Input
+                    id="user-temp-password"
+                    type={showPassword ? "text" : "password"}
+                    autoComplete="new-password"
+                    value={temporaryPassword}
+                    onChange={(event) => setTemporaryPassword(event.target.value)}
+                    placeholder="Temporary password"
+                    className="pr-10"
+                  />
+                  <button
+                    type="button"
+                    className="absolute inset-y-0 right-0 flex items-center px-2 text-slate-500 hover:text-slate-700"
+                    onClick={() => setShowPassword((prev) => !prev)}
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                  >
+                    {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                  </button>
+                </div>
               </div>
               <div className="sm:col-span-2 lg:col-span-5">
                 <Button type="submit" disabled={createUserMutation.isPending} className="inline-flex items-center gap-2">

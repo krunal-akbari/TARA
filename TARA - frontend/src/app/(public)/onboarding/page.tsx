@@ -55,8 +55,9 @@ export default function OnboardingPage() {
 
         <form className="mt-5 grid gap-4 sm:grid-cols-2" onSubmit={onSubmit}>
           <div className="sm:col-span-2">
-            <Label>Onboarding Key</Label>
+            <Label htmlFor="onboarding-key">Onboarding Key</Label>
             <Input
+              id="onboarding-key"
               value={onboardingKey}
               onChange={(e) => setOnboardingKey(e.target.value)}
               placeholder="e.g. nalashaa"
@@ -64,16 +65,16 @@ export default function OnboardingPage() {
             />
           </div>
           <div>
-            <Label>Company Name</Label>
-            <Input value={tenantName} onChange={(e) => setTenantName(e.target.value)} placeholder="e.g. Nalashaa" required />
+            <Label htmlFor="company-name">Company Name</Label>
+            <Input id="company-name" value={tenantName} onChange={(e) => setTenantName(e.target.value)} placeholder="e.g. Nalashaa" required />
           </div>
           <div>
-            <Label>Admin Email</Label>
-            <Input type="email" value={adminEmail} onChange={(e) => setAdminEmail(e.target.value)} required />
+            <Label htmlFor="admin-email">Admin Email</Label>
+            <Input id="admin-email" type="email" autoComplete="email" value={adminEmail} onChange={(e) => setAdminEmail(e.target.value)} required />
           </div>
           <div>
-            <Label>Admin Password</Label>
-            <Input type="password" value={adminPassword} onChange={(e) => setAdminPassword(e.target.value)} required />
+            <Label htmlFor="admin-password">Admin Password</Label>
+            <Input id="admin-password" type="password" autoComplete="new-password" value={adminPassword} onChange={(e) => setAdminPassword(e.target.value)} required />
           </div>
           <div>
             <Label>Currency</Label>

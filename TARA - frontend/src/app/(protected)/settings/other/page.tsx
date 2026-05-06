@@ -58,7 +58,7 @@ function toTitle(value: string) {
 }
 
 export default function SettingsOtherPage() {
-  const { catalog, setValues, resetDefaults } = useSettingsCatalog();
+  const { catalog, defaults, setValues, setDefault, resetDefaults } = useSettingsCatalog();
   const [drafts, setDrafts] = useState<Record<SettingsCatalogKey, string>>({
     candidate_status: "",
     candidate_source: "",
@@ -106,10 +106,14 @@ export default function SettingsOtherPage() {
     if (!state) return;
     const nextValue = state.value.trim();
     if (!nextValue) return;
+    const shouldKeepDefault = defaults[key] === state.original;
     setValues(
       key,
       catalog[key].map((item) => (item === state.original ? nextValue : item)),
     );
+    if (shouldKeepDefault) {
+      setDefault(key, nextValue);
+    }
     setEditing((prev) => ({ ...prev, [key]: null }));
   };
 
@@ -154,13 +158,14 @@ export default function SettingsOtherPage() {
                   <tr className="border-b border-slate-200 text-left text-slate-700">
                     <th className="px-2 py-2 font-medium">Value</th>
                     <th className="w-24 px-2 py-2 font-medium">Preview</th>
+                    <th className="w-28 px-2 py-2 font-medium">Default</th>
                     <th className="w-28 px-2 py-2 font-medium">Action</th>
                   </tr>
                 </thead>
                 <tbody>
                   {catalog[section.key].length === 0 ? (
                     <tr>
-                      <td className="px-2 py-3 text-slate-500" colSpan={3}>
+                      <td className="px-2 py-3 text-slate-500" colSpan={4}>
                         No values configured.
                       </td>
                     </tr>
@@ -190,6 +195,22 @@ export default function SettingsOtherPage() {
                           {editing[section.key]?.original === value
                             ? toTitle(editing[section.key]?.value ?? "")
                             : toTitle(value)}
+                        </td>
+                        <td className="px-2 py-2">
+                          {defaults[section.key] === value ? (
+                            <span className="inline-flex items-center rounded-full bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-700">
+                              Default
+                            </span>
+                          ) : (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              className="h-8 px-2 text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                              onClick={() => setDefault(section.key, value)}
+                            >
+                              Set Default
+                            </Button>
+                          )}
                         </td>
                         <td className="px-2 py-2">
                           <div className="flex items-center gap-1">

@@ -64,20 +64,20 @@ export default function BootstrapPage() {
 
         <form className="mt-5 grid gap-4" onSubmit={onSubmit}>
           <div>
-            <Label>Bootstrap Key</Label>
-            <Input value={bootstrapKey} onChange={(e) => setBootstrapKey(e.target.value)} required />
+            <Label htmlFor="bootstrap-key">Bootstrap Key</Label>
+            <Input id="bootstrap-key" value={bootstrapKey} onChange={(e) => setBootstrapKey(e.target.value)} required />
           </div>
           <div>
-            <Label>Company Name</Label>
-            <Input value={tenantName} onChange={(e) => setTenantName(e.target.value)} required />
+            <Label htmlFor="company-name">Company Name</Label>
+            <Input id="company-name" value={tenantName} onChange={(e) => setTenantName(e.target.value)} required />
           </div>
           <div>
-            <Label>Admin Email</Label>
-            <Input type="email" value={adminEmail} onChange={(e) => setAdminEmail(e.target.value)} required />
+            <Label htmlFor="admin-email">Admin Email</Label>
+            <Input id="admin-email" type="email" autoComplete="email" value={adminEmail} onChange={(e) => setAdminEmail(e.target.value)} required />
           </div>
           <div>
-            <Label>Admin Password</Label>
-            <Input type="password" value={adminPassword} onChange={(e) => setAdminPassword(e.target.value)} required />
+            <Label htmlFor="admin-password">Admin Password</Label>
+            <Input id="admin-password" type="password" autoComplete="new-password" value={adminPassword} onChange={(e) => setAdminPassword(e.target.value)} required />
           </div>
           <ErrorBanner message={error} />
           {success ? <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{success}</div> : null}

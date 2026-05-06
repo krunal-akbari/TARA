@@ -1,4 +1,4 @@
-import { apiGet, apiGetBlob, apiUpload } from "@/lib/api/http";
+import { apiGet, apiGetBlob, apiPost, apiUpload } from "@/lib/api/http";
 import { Resume, ResumeListResponse } from "@/lib/types/entities";
 
 interface ResumeQuery {
@@ -31,6 +31,10 @@ export function uploadResume(candidateId: number | string, file: File) {
   return apiUpload<Resume>(`/api/v1/candidates/${candidateId}/resumes`, formData);
 }
 
+export function retryResumeParse(candidateId: number | string, resumeId: number | string) {
+  return apiPost<Resume>(`/api/v1/candidates/${candidateId}/resumes/${resumeId}/retry-parse`);
+}
+
 export function getResumeContent(candidateId: number | string, resumeId: number | string) {
   return apiGetBlob(`/api/v1/candidates/${candidateId}/resumes/${resumeId}/content`);
 }
@@ -43,4 +47,10 @@ export function extractResumePreview(file: File) {
   const formData = new FormData();
   formData.append("file", file);
   return apiUpload<ResumeExtractPreview>("/api/v1/resumes/extract-preview", formData);
+}
+
+export function getResumeStatusPollInterval(response?: Pick<ResumeListResponse, "items"> | null) {
+  return response?.items.some((resume) => resume.parse_status === "pending" || resume.parse_status === "processing")
+    ? 3000
+    : false;
 }

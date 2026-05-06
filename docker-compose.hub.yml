@@ -1,38 +1,35 @@
 services:
-  # Database - PostgreSQL
   db:
     image: postgres:16
     container_name: tara-db
     environment:
-      POSTGRES_DB: tara
-      POSTGRES_USER: tara
-      POSTGRES_PASSWORD: tara
+      POSTGRES_DB: ${POSTGRES_DB:-tara}
+      POSTGRES_USER: ${POSTGRES_USER:-tara}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-tara}
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
       - tara-network
     restart: unless-stopped
 
-  # Redis - Message broker and cache
   redis:
     image: redis:7
     container_name: tara-redis
     ports:
-      - "6379:6379"
+      - "${REDIS_PORT:-6379}:6379"
     networks:
       - tara-network
     restart: unless-stopped
 
-  # MinerU API - Resume parsing service
   mineru-api:
     image: pulsia/mineru25apipulsia:latest
     container_name: tara-mineru-api
     profiles:
       - mineru
     ports:
-      - "18000:8000"
+      - "${MINERU_PORT:-18000}:8000"
     environment:
       MINERU_MODEL_SOURCE: ${MINERU_MODEL_SOURCE:-huggingface}
       HF_HUB_DISABLE_XET: ${HF_HUB_DISABLE_XET:-1}
@@ -45,22 +42,12 @@ services:
       - tara-network
     restart: unless-stopped
 
-  # Backend API - FastAPI application
   api:
     image: krunalakbari/tara-api:latest
-    build:
-      context: ./TARA - backend
-      dockerfile: Dockerfile
     container_name: tara-api
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
     user: "0:0"
-    env_file:
-      - path: ./TARA - backend/.env
-        required: false
-      - path: ./TARA - backend/.env.local
-        required: false
     environment:
-      DATABASE_URL: sqlite:////var/lib/tara/tara.db
+      DATABASE_URL: ${DATABASE_URL:-sqlite:////var/lib/tara/tara.db}
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:-tara-local-jwt-secret}
       BOOTSTRAP_API_KEY: ${BOOTSTRAP_API_KEY:-tara-local-bootstrap-key}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
@@ -74,33 +61,23 @@ services:
       MINERU_PDF_MAX_PAGES: ${MINERU_PDF_MAX_PAGES:-3}
       MINERU_PDF_RENDER_SCALE: ${MINERU_PDF_RENDER_SCALE:-2.0}
     ports:
-      - "8000:8000"
+      - "${API_PORT:-8000}:8000"
     depends_on:
       - db
       - redis
     volumes:
-      - ./TARA - backend:/app
       - tara_runtime_data:/var/lib/tara
     networks:
       - tara-network
     restart: unless-stopped
 
-  # Celery Worker - Background task processing
   worker:
     image: krunalakbari/tara-api:latest
-    build:
-      context: ./TARA - backend
-      dockerfile: Dockerfile
     container_name: tara-worker
     command: celery -A app.tasks.celery_app.celery_app worker --loglevel=info --concurrency=4 -Q resume_ingest,routing_events,notifications
     user: "0:0"
-    env_file:
-      - path: ./TARA - backend/.env
-        required: false
-      - path: ./TARA - backend/.env.local
-        required: false
     environment:
-      DATABASE_URL: sqlite:////var/lib/tara/tara.db
+      DATABASE_URL: ${DATABASE_URL:-sqlite:////var/lib/tara/tara.db}
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:-tara-local-jwt-secret}
       BOOTSTRAP_API_KEY: ${BOOTSTRAP_API_KEY:-tara-local-bootstrap-key}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
@@ -118,22 +95,13 @@ services:
       - redis
       - api
     volumes:
-      - ./TARA - backend:/app
       - tara_runtime_data:/var/lib/tara
     networks:
       - tara-network
     restart: unless-stopped
 
-  # Frontend - Next.js application
   frontend:
     image: krunalakbari/tara-frontend:latest
-    build:
-      context: ./TARA - frontend
-      dockerfile: Dockerfile
-      args:
-        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-/backend}
-        NEXT_PUBLIC_ENABLE_BOOTSTRAP_PAGE: ${NEXT_PUBLIC_ENABLE_BOOTSTRAP_PAGE:-false}
-        API_PROXY_TARGET: ${API_PROXY_TARGET:-http://api:8000}
     container_name: tara-frontend
     environment:
       NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-/backend}
@@ -141,7 +109,7 @@ services:
       API_PROXY_TARGET: ${API_PROXY_TARGET:-http://api:8000}
       NODE_ENV: production
     ports:
-      - "3000:3000"
+      - "${FRONTEND_PORT:-3000}:3000"
     depends_on:
       - api
     networks:

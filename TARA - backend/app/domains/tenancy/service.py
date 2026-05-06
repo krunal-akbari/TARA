@@ -5,8 +5,10 @@ from app.domains.auth.models import Role, User, UserRole
 from app.domains.tenancy.models import Tenant
 from app.domains.tenancy.schemas import TenantBootstrapRequest
 from app.platform.security import hash_password
+from app.platform.settings import get_settings
 
 DEFAULT_ROLES = ["admin", "manager", "recruiter", "hr"]
+settings = get_settings()
 
 
 def _ensure_default_roles(db: Session) -> list[Role]:
@@ -53,3 +55,34 @@ def bootstrap_tenant(db: Session, payload: TenantBootstrapRequest) -> tuple[Tena
     db.refresh(tenant)
     db.refresh(admin_user)
     return tenant, admin_user, [r.name for r in roles]
+
+
+def get_tenant_by_id(db: Session, tenant_id: int) -> Tenant | None:
+    return db.scalar(select(Tenant).where(Tenant.id == tenant_id))
+
+
+def get_effective_resume_upload_max_bytes(*, tenant: Tenant | None) -> int:
+    if tenant and tenant.resume_upload_max_bytes and tenant.resume_upload_max_bytes > 0:
+        return tenant.resume_upload_max_bytes
+    return settings.max_resume_upload_bytes
+
+
+def get_effective_resume_upload_max_bytes_for_tenant(db: Session, *, tenant_id: int) -> int:
+    tenant = get_tenant_by_id(db=db, tenant_id=tenant_id)
+    return get_effective_resume_upload_max_bytes(tenant=tenant)
+
+
+def update_tenant_resume_upload_max_bytes(
+    db: Session,
+    *,
+    tenant_id: int,
+    resume_upload_max_bytes: int | None,
+) -> Tenant:
+    tenant = get_tenant_by_id(db=db, tenant_id=tenant_id)
+    if not tenant:
+        raise ValueError("Tenant not found")
+
+    tenant.resume_upload_max_bytes = resume_upload_max_bytes
+    db.commit()
+    db.refresh(tenant)
+    return tenant

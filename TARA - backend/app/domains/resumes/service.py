@@ -1,10 +1,13 @@
 import os
 import re
+import shutil
+import subprocess
+import tempfile
+import xml.etree.ElementTree as ET
 from io import BytesIO
 from pathlib import Path
 from uuid import uuid4
 from zipfile import BadZipFile, ZipFile
-import xml.etree.ElementTree as ET
 
 import boto3
 from pypdf import PdfReader
@@ -130,6 +133,46 @@ def _extract_docx_text(data: bytes) -> str:
     return "\n".join(lines).strip()
 
 
+def _extract_doc_text(data: bytes) -> str:
+    antiword_path = shutil.which("antiword")
+    if not antiword_path:
+        raise ValueError(
+            "Legacy .doc parsing requires antiword on the backend. Install antiword or convert the file to PDF or DOCX."
+        )
+
+    temp_path: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(suffix=".doc", delete=False) as handle:
+            handle.write(data)
+            temp_path = Path(handle.name)
+
+        result = subprocess.run(
+            [antiword_path, str(temp_path)],
+            capture_output=True,
+            check=False,
+            text=True,
+            encoding="utf-8",
+            errors="ignore",
+            timeout=30,
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        raise ValueError(f"Could not extract readable text from DOC file: {exc}") from exc
+    finally:
+        if temp_path is not None:
+            temp_path.unlink(missing_ok=True)
+
+    if result.returncode != 0:
+        detail = _collapse_spaces(result.stderr or result.stdout)
+        if detail:
+            raise ValueError(f"Could not extract readable text from DOC file: {detail}")
+        raise ValueError("Could not extract readable text from DOC file")
+
+    text = result.stdout.strip()
+    if not text:
+        raise ValueError("Could not extract readable text from DOC file")
+    return text
+
+
 def _extract_text_native(file_name: str, content_type: str, data: bytes) -> str:
     suffix = Path(file_name).suffix.lower()
     content = content_type.lower()
@@ -138,10 +181,10 @@ def _extract_text_native(file_name: str, content_type: str, data: bytes) -> str:
         text = _extract_pdf_text(data)
     elif suffix == ".docx" or "wordprocessingml.document" in content:
         text = _extract_docx_text(data)
+    elif suffix == ".doc" or content == "application/msword":
+        text = _extract_doc_text(data)
     elif suffix in {".txt", ".md", ".rtf"} or content.startswith("text/"):
         text = data.decode("utf-8", errors="ignore").strip()
-    elif suffix == ".doc":
-        raise ValueError("Legacy .doc format is not supported. Upload PDF, DOCX, or TXT.")
     else:
         # Best-effort plain text fallback for unknown formats.
         text = data.decode("utf-8", errors="ignore").strip()
@@ -151,8 +194,23 @@ def _extract_text_native(file_name: str, content_type: str, data: bytes) -> str:
     return text
 
 
+def _prefers_native_parser(file_name: str, content_type: str) -> bool:
+    suffix = Path(file_name).suffix.lower()
+    content = content_type.lower()
+
+    return (
+        suffix in {".doc", ".docx", ".txt", ".md", ".rtf"}
+        or content == "application/msword"
+        or "wordprocessingml.document" in content
+        or content.startswith("text/")
+    )
+
+
 def _extract_text(file_name: str, content_type: str, data: bytes) -> str:
     backend = settings.resume_parser_backend.strip().lower()
+
+    if _prefers_native_parser(file_name=file_name, content_type=content_type):
+        return _extract_text_native(file_name=file_name, content_type=content_type, data=data)
 
     if backend in {"mineru", "auto"}:
         try:
@@ -293,16 +351,39 @@ def create_resume(
     db.commit()
     db.refresh(resume)
 
-    if settings.env != "test":
-        try:
-            from app.tasks.resume_tasks import process_resume
-
-            process_resume.apply_async(args=[resume.id], retry=False, queue="resume_ingest")
-        except Exception:
-            # Queue failures should not rollback persisted upload metadata.
-            pass
+    enqueue_resume_processing(resume.id)
 
     return resume
+
+
+def enqueue_resume_processing(candidate_resume_id: int) -> bool:
+    if settings.env == "test":
+        return False
+
+    try:
+        from app.tasks.resume_tasks import process_resume
+
+        process_resume.apply_async(args=[candidate_resume_id], retry=False, queue="resume_ingest")
+        return True
+    except Exception:
+        # Queue failures should not rollback persisted upload metadata.
+        return False
+
+
+def get_resume(
+    db: Session,
+    *,
+    tenant_id: int,
+    candidate_id: int,
+    resume_id: int,
+) -> CandidateResume | None:
+    return db.scalar(
+        select(CandidateResume).where(
+            CandidateResume.tenant_id == tenant_id,
+            CandidateResume.candidate_id == candidate_id,
+            CandidateResume.id == resume_id,
+        )
+    )
 
 
 def list_resumes(

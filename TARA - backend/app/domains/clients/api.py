@@ -14,12 +14,10 @@ from app.domains.clients.schemas import (
 from app.domains.clients.service import (
     create_client,
     create_client_contact,
-    delete_client_contact,
     get_client,
     list_client_contacts,
     list_clients,
     restore_client,
-    soft_delete_client,
     update_client,
     update_client_contact,
 )
@@ -131,27 +129,13 @@ def update_client_endpoint(
     return _to_response(updated)
 
 
-@router.delete("/{client_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{client_id}", status_code=status.HTTP_405_METHOD_NOT_ALLOWED)
 def delete_client_endpoint(
     client_id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-    roles: list[str] = Depends(get_current_roles),
+    _: User = Depends(get_current_user),
 ) -> None:
-    client = get_client(db=db, tenant_id=current_user.tenant_id, client_id=client_id)
-    if not client:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Client not found")
-    try:
-        soft_delete_client(
-            db=db,
-            tenant_id=current_user.tenant_id,
-            actor_user_id=current_user.id,
-            roles=roles,
-            client=client,
-        )
-    except PermissionError as exc:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
-    return None
+    _ = client_id
+    raise HTTPException(status_code=status.HTTP_405_METHOD_NOT_ALLOWED, detail="Deletion is disabled")
 
 
 @router.post("/{client_id}/restore", response_model=ClientResponse)
@@ -267,25 +251,11 @@ def update_contact_endpoint(
     return _contact_to_response(contact)
 
 
-@router.delete("/{client_id}/contacts/{contact_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{client_id}/contacts/{contact_id}", status_code=status.HTTP_405_METHOD_NOT_ALLOWED)
 def delete_contact_endpoint(
     client_id: int,
     contact_id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-    roles: list[str] = Depends(get_current_roles),
+    _: User = Depends(get_current_user),
 ) -> None:
-    try:
-        delete_client_contact(
-            db=db,
-            tenant_id=current_user.tenant_id,
-            client_id=client_id,
-            contact_id=contact_id,
-            actor_user_id=current_user.id,
-            roles=roles,
-        )
-    except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
-    except PermissionError as exc:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
-    return None
+    _ = (client_id, contact_id)
+    raise HTTPException(status_code=status.HTTP_405_METHOD_NOT_ALLOWED, detail="Deletion is disabled")

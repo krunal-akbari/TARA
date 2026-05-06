@@ -4,7 +4,7 @@ interface Props {
   page: number;
   pageSize: number;
   total: number;
-  onPageChange: (next: number) => void;
+  onPageChange: (_page: number) => void;
 }
 
 export function PaginationControls({ page, pageSize, total, onPageChange }: Props) {

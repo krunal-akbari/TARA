@@ -5,7 +5,16 @@
       "Bash(docker ps:*)",
       "Bash(docker rm:*)",
       "Bash(docker-compose up:*)",
-      "Bash(docker-compose ps:*)"
+      "Bash(docker-compose ps:*)",
+      "Bash(npm run build:*)",
+      "Bash(npm install:*)",
+      "Bash(npx next build:*)",
+      "Bash(npx tsc:*)",
+      "Bash(dir:*)",
+      "Bash(cd \"C:\\\\Users\\\\krunal\\\\OneDrive - Nalashaa Solutions India Pvt Ltd\\\\project\\\\TARA\\\\TARA - frontend\" && npm run typecheck 2>&1 | tail -20)",
+      "Bash(cd \"C:\\\\Users\\\\krunal\\\\OneDrive - Nalashaa Solutions India Pvt Ltd\\\\project\\\\TARA\\\\TARA - frontend\" && npm run typecheck 2>&1 | tail -15)",
+      "Bash(cd \"C:\\\\Users\\\\krunal\\\\OneDrive - Nalashaa Solutions India Pvt Ltd\\\\project\\\\TARA\\\\TARA - frontend\" && npm run typecheck 2>&1 | tail -10)",
+      "Bash(node -e \"const p=require\\('./\\\\\"TARA - frontend/package.json\\\\\"'\\);console.log\\(p.dependencies.next\\)\" 2>/dev/null; cat \"TARA - frontend/package.json\" | grep '\"next\"')"
     ]
   }
 }

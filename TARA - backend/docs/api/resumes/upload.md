@@ -14,6 +14,7 @@
 ## Constraints
 - Empty uploads are rejected.
 - Maximum size is controlled by `MAX_RESUME_UPLOAD_BYTES` (default `10485760` bytes / 10 MB).
+- Resume text extraction supports `PDF`, `DOCX`, `DOC`, and plain-text uploads such as `TXT`.
 - Stored object key is generated uniquely per upload (UUID-prefixed), so uploading the same file name does not overwrite prior uploads.
 
 ## cURL Example

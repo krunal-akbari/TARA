@@ -15,11 +15,9 @@ import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { getApiErrorMessage } from "@/lib/api/http";
 import { queryKeys } from "@/lib/query-keys";
-import { createLink, deleteLink, listLinks, restoreLink, updateLink } from "@/lib/services/links";
+import { createLink, listLinks, restoreLink, updateLink } from "@/lib/services/links";
 import {
   createVendorContact,
-  deleteVendor,
-  deleteVendorContact,
   getVendor,
   listVendorContacts,
   restoreVendor,
@@ -27,7 +25,7 @@ import {
   updateVendorContact,
 } from "@/lib/services/vendors";
 import { cn } from "@/lib/utils/cn";
-import { toTitleCase } from "@/lib/utils/format";
+import { formatDate, formatId, toTitleCase } from "@/lib/utils/format";
 
 type VendorTabId = "overview" | "edit" | "links" | "contacts";
 
@@ -73,12 +71,6 @@ function VendorLinkManager({ vendorId }: { vendorId: number }) {
     mutationFn: ({ linkId, status }: { linkId: number; status: string }) => updateLink(linkId, { status }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.vendors.links(vendorId, includeDeletedLinks) }),
     onError: (err) => setLinkError(getApiErrorMessage(err, "Failed to update link")),
-  });
-
-  const deleteLinkMutation = useMutation({
-    mutationFn: (linkId: number) => deleteLink(linkId),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.vendors.links(vendorId, includeDeletedLinks) }),
-    onError: (err) => setLinkError(getApiErrorMessage(err, "Failed to delete link")),
   });
 
   const restoreLinkMutation = useMutation({
@@ -192,11 +184,7 @@ function VendorLinkManager({ vendorId }: { vendorId: number }) {
                       <Button type="button" variant="secondary" onClick={() => restoreLinkMutation.mutate(link.id)}>
                         Restore
                       </Button>
-                    ) : (
-                      <Button type="button" variant="danger" onClick={() => deleteLinkMutation.mutate(link.id)}>
-                        Delete
-                      </Button>
-                    )}
+                    ) : null}
                   </div>
                 </td>
               </tr>
@@ -270,12 +258,6 @@ export default function VendorDetailPage() {
     onError: (err) => setError(getApiErrorMessage(err, "Failed to update vendor")),
   });
 
-  const deleteMutation = useMutation({
-    mutationFn: () => deleteVendor(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.vendors.detail(id) }),
-    onError: (err) => setError(getApiErrorMessage(err, "Failed to delete vendor")),
-  });
-
   const restoreMutation = useMutation({
     mutationFn: () => restoreVendor(id),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.vendors.detail(id) }),
@@ -309,7 +291,6 @@ export default function VendorDetailPage() {
         contactId: number,
         payload: { first_name: string; last_name: string; email: string | null; phone: string | null },
       ) => updateVendorContact(id, contactId, payload),
-      delete: (contactId: number) => deleteVendorContact(id, contactId),
     }),
     [id],
   );
@@ -373,7 +354,7 @@ export default function VendorDetailPage() {
                 </div>
                 <div>
                   <p className="text-xs font-medium text-slate-500">Owner</p>
-                  <p className="mt-1 tabular-nums text-slate-900">{data.owner_user_id}</p>
+                  <p className="mt-1 tabular-nums text-slate-900">{formatId(data.owner_user_id, "Owner")}</p>
                 </div>
               </div>
             </div>
@@ -407,68 +388,59 @@ export default function VendorDetailPage() {
                 <div className="grid grid-cols-2 border-b border-slate-200 px-3 py-2"><span className="text-slate-700">Sector</span><span className="text-slate-900">{data.sector || "-"}</span></div>
                 <div className="grid grid-cols-2 border-b border-slate-200 px-3 py-2"><span className="text-slate-700">Linked Clients</span><span className="tabular-nums text-slate-900">{activeLinksCount}</span></div>
                 <div className="grid grid-cols-2 border-b border-slate-200 px-3 py-2"><span className="text-slate-700">Contacts</span><span className="tabular-nums text-slate-900">{contactList.length}</span></div>
-                <div className="grid grid-cols-2 px-3 py-2"><span className="text-slate-700">Deleted At</span><span className="text-slate-900">{data.deleted_at || "-"}</span></div>
+                <div className="grid grid-cols-2 px-3 py-2"><span className="text-slate-700">Deleted At</span><span className="text-slate-900">{formatDate(data.deleted_at)}</span></div>
               </div>
             </Card>
           ) : null}
 
           {activeTab === "edit" ? (
-            <Card>
-              <form className="grid gap-3 sm:max-w-2xl sm:grid-cols-2" onSubmit={onSubmit}>
-                <div>
-                  <Label>Name</Label>
-                  <Input
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    maxLength={NAME_MAX}
-                    placeholder="Vendor name"
-                    required
-                  />
-                </div>
-                <div>
-                  <Label>Status</Label>
-                  <Select value={statusValue} onChange={(e) => setStatusValue(e.target.value === "inactive" ? "inactive" : "active")}>
-                    <option value="active">Active</option>
-                    <option value="inactive">Inactive</option>
-                  </Select>
-                </div>
-                <div>
-                  <Label>Address</Label>
-                  <Input
-                    value={address}
-                    onChange={(e) => setAddress(e.target.value)}
-                    maxLength={ADDRESS_MAX}
-                    placeholder="Street / postal address"
-                  />
-                </div>
-                <div>
-                  <Label>Sector</Label>
-                  <Input
-                    value={sector}
-                    onChange={(e) => setSector(e.target.value)}
-                    maxLength={SECTOR_MAX}
-                    placeholder="Industry sector"
-                  />
-                </div>
-                <div className="sm:col-span-2 flex gap-2">
-                  <Button type="submit" disabled={updateMutation.isPending}>Save</Button>
-                  {data.deleted_at ? (
-                    <Button type="button" variant="secondary" onClick={() => restoreMutation.mutate()}>Restore</Button>
-                  ) : (
-                    <Button
-                      type="button"
-                      variant="danger"
-                      onClick={() => {
-                        if (!window.confirm(`Delete vendor "${data.name}"?`)) return;
-                        deleteMutation.mutate();
-                      }}
-                    >
-                      Delete
-                    </Button>
-                  )}
-                </div>
-              </form>
-            </Card>
+            <>
+              <Card>
+                <form className="grid gap-3 sm:max-w-2xl sm:grid-cols-2" onSubmit={onSubmit}>
+                  <div>
+                    <Label>Name</Label>
+                    <Input
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      maxLength={NAME_MAX}
+                      placeholder="Vendor name"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <Label>Status</Label>
+                    <Select value={statusValue} onChange={(e) => setStatusValue(e.target.value === "inactive" ? "inactive" : "active")}>
+                      <option value="active">Active</option>
+                      <option value="inactive">Inactive</option>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label>Address</Label>
+                    <Input
+                      value={address}
+                      onChange={(e) => setAddress(e.target.value)}
+                      maxLength={ADDRESS_MAX}
+                      placeholder="Street / postal address"
+                    />
+                  </div>
+                  <div>
+                    <Label>Sector</Label>
+                    <Input
+                      value={sector}
+                      onChange={(e) => setSector(e.target.value)}
+                      maxLength={SECTOR_MAX}
+                      placeholder="Industry sector"
+                    />
+                  </div>
+                  <div className="sm:col-span-2 flex gap-2">
+                    <Button type="submit" disabled={updateMutation.isPending}>Save</Button>
+                    {data.deleted_at ? (
+                      <Button type="button" variant="secondary" onClick={() => restoreMutation.mutate()}>Restore</Button>
+                    ) : null}
+                  </div>
+                </form>
+              </Card>
+            </>
           ) : null}
 
           {activeTab === "links" ? (

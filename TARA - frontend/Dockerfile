@@ -1,7 +1,7 @@
 FROM node:20-slim AS deps
 WORKDIR /app
 COPY package*.json ./
-RUN npm ci --include=optional
+RUN npm ci --include=optional --os=linux --cpu=x64 --libc=glibc
 
 FROM node:20-slim AS builder
 WORKDIR /app

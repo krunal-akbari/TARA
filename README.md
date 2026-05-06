@@ -6,6 +6,19 @@ TARA is a modern, multi-tenant Applicant Tracking System (ATS) built with Next.j
 
 The easiest way to run the entire TARA application is using the unified Docker Compose setup:
 
+### Run from Docker Hub on Another Device
+
+```bash
+curl -L -o docker-compose.yml https://raw.githubusercontent.com/krunal-akbari/TARA/main/docker-compose.hub.yml
+docker compose up -d
+```
+
+This pulls the published images from Docker Hub:
+- `krunalakbari/tara-api:latest`
+- `krunalakbari/tara-frontend:latest`
+
+No source checkout is required for the Docker Hub setup. The application runs at http://localhost:3000 and stores runtime data in Docker named volumes.
+
 ### Prerequisites
 
 - [Docker Desktop](https://www.docker.com/products/docker-desktop) installed and running
@@ -29,7 +42,7 @@ chmod +x start-tara.sh
 **Option 2: Using Docker Compose directly**
 
 ```bash
-docker-compose up -d
+docker compose up --build -d
 ```
 
 ### Accessing the Application
@@ -38,7 +51,12 @@ Once started, access:
 - **Frontend**: http://localhost:3000
 - **Backend API**: http://localhost:8000
 - **API Documentation**: http://localhost:8000/docs
-- **MinerU API Docs**: http://localhost:18000/docs
+
+MinerU is optional because it requires NVIDIA GPU support. To start with MinerU enabled:
+
+```bash
+RESUME_PARSER_BACKEND=mineru docker compose --profile mineru up --build -d
+```
 
 ### Stopping the Application
 
@@ -54,7 +72,7 @@ Linux/Mac:
 
 Or using Docker Compose:
 ```bash
-docker-compose down
+docker compose down
 ```
 
 ## Project Structure

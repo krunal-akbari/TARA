@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 
 import { PageHeader } from "@/components/common/page-header";
+import { formatId } from "@/lib/utils/format";
 import { PaginationControls } from "@/components/common/pagination-controls";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -36,12 +37,12 @@ export default function AuditPage() {
       <Card>
         <div className="grid gap-3 sm:grid-cols-3">
           <div>
-            <Label>Entity Type</Label>
-            <Input value={entityType} onChange={(e) => setEntityType(e.target.value)} placeholder="job, client, candidate" />
+            <Label htmlFor="audit-entity-type">Entity Type</Label>
+            <Input id="audit-entity-type" value={entityType} onChange={(e) => setEntityType(e.target.value)} placeholder="job, client, candidate" />
           </div>
           <div>
-            <Label>Entity ID</Label>
-            <Input value={entityId} onChange={(e) => setEntityId(e.target.value)} placeholder="uuid" />
+            <Label htmlFor="audit-entity-id">Entity ID</Label>
+            <Input id="audit-entity-id" value={entityId} onChange={(e) => setEntityId(e.target.value)} placeholder="uuid" />
           </div>
           <div className="flex items-end">
             <Button
@@ -72,7 +73,7 @@ export default function AuditPage() {
                 <tr key={event.id} className="border-b align-top">
                   <td className="px-2 py-2 text-slate-700">{event.entity_type}:{event.entity_id}</td>
                   <td className="px-2 py-2">{event.event_type}</td>
-                  <td className="px-2 py-2">{event.actor_user_id}</td>
+                  <td className="px-2 py-2">{formatId(event.actor_user_id, "User")}</td>
                   <td className="px-2 py-2"><pre className="whitespace-pre-wrap text-xs">{JSON.stringify(event.payload_json)}</pre></td>
                 </tr>
               ))}

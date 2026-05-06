@@ -1,5 +1,9 @@
 FROM python:3.12-slim
 
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends antiword \
+    && rm -rf /var/lib/apt/lists/*
+
 RUN groupadd -r appuser && useradd -r -g appuser -u 1001 appuser
 
 ENV PYTHONDONTWRITEBYTECODE=1

@@ -1,12 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Binoculars, FileText, UserRound, X } from "lucide-react";
-import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
+import { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from "react";
 
 import { ErrorBanner } from "@/components/common/error-banner";
 import { ListPageShell } from "@/components/common/list-page-shell";
+import { StatusChip } from "@/components/common/status-chip";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
@@ -16,9 +17,11 @@ import { useSettingsCatalog } from "@/hooks/use-settings-catalog";
 import { getApiErrorMessage } from "@/lib/api/http";
 import { useAuthStore } from "@/lib/auth-store";
 import { queryKeys } from "@/lib/query-keys";
-import { createCandidate, getCandidate, listCandidates, restoreCandidate } from "@/lib/services/candidates";
+import { createCandidate, getCandidate, listCandidates } from "@/lib/services/candidates";
 import { listClients } from "@/lib/services/clients";
+import { listCandidateJobApplications } from "@/lib/services/jobs";
 import { extractResumePreview, uploadResume } from "@/lib/services/resumes";
+import type { Candidate } from "@/lib/types/entities";
 import { listVendors } from "@/lib/services/vendors";
 import { cn } from "@/lib/utils/cn";
 import { toTitleCase } from "@/lib/utils/format";
@@ -69,12 +72,76 @@ const EMPTY_CANDIDATE_FORM = {
 
 type CandidateForm = typeof EMPTY_CANDIDATE_FORM;
 type CandidatePreviewTab = "details" | "notes" | "resume" | "experience";
+type ToggleableCandidateColumnKey =
+  | "id"
+  | "firstName"
+  | "lastName"
+  | "status"
+  | "groupBu"
+  | "currentCompany"
+  | "ownerUserId"
+  | "dedupeFingerprint"
+  | "generalNotes"
+  | "statusNotes"
+  | "payNotes"
+  | "otherNotes"
+  | "deletedAt"
+  | "applications";
+type CandidateTableColumn = {
+  key: string;
+  header: React.ReactNode;
+  headerClassName?: string;
+  cellClassName?: string;
+  defaultWidth: number;
+  minWidth: number;
+  toggleableKey?: ToggleableCandidateColumnKey;
+  render: (_candidate: Candidate) => React.ReactNode;
+};
+
+const CANDIDATE_COLUMN_OPTIONS: Array<{ key: ToggleableCandidateColumnKey; label: string }> = [
+  { key: "id", label: "ID" },
+  { key: "firstName", label: "First Name" },
+  { key: "lastName", label: "Last Name" },
+  { key: "status", label: "Status" },
+  { key: "groupBu", label: "Group (BU)" },
+  { key: "currentCompany", label: "Current Company" },
+  { key: "ownerUserId", label: "Owner" },
+  { key: "dedupeFingerprint", label: "Dedupe Fingerprint" },
+  { key: "generalNotes", label: "General Notes" },
+  { key: "statusNotes", label: "Status Notes" },
+  { key: "payNotes", label: "Pay Notes" },
+  { key: "otherNotes", label: "Other Notes" },
+  { key: "deletedAt", label: "Deleted At" },
+  { key: "applications", label: "Applications" },
+];
+
+const DEFAULT_VISIBLE_CANDIDATE_COLUMNS: ToggleableCandidateColumnKey[] =
+  CANDIDATE_COLUMN_OPTIONS.map((option) => option.key);
+
+const CANDIDATE_COLUMN_DIMENSIONS: Record<string, { defaultWidth: number; minWidth: number }> = {
+  selection: { defaultWidth: 56, minWidth: 56 },
+  id: { defaultWidth: 72, minWidth: 60 },
+  firstName: { defaultWidth: 140, minWidth: 100 },
+  lastName: { defaultWidth: 140, minWidth: 100 },
+  status: { defaultWidth: 120, minWidth: 100 },
+  groupBu: { defaultWidth: 130, minWidth: 110 },
+  currentCompany: { defaultWidth: 250, minWidth: 140 },
+  ownerUserId: { defaultWidth: 100, minWidth: 80 },
+  dedupeFingerprint: { defaultWidth: 280, minWidth: 160 },
+  generalNotes: { defaultWidth: 210, minWidth: 140 },
+  statusNotes: { defaultWidth: 210, minWidth: 140 },
+  payNotes: { defaultWidth: 210, minWidth: 140 },
+  otherNotes: { defaultWidth: 210, minWidth: 140 },
+  deletedAt: { defaultWidth: 170, minWidth: 120 },
+  applications: { defaultWidth: 120, minWidth: 100 },
+};
 
 export default function CandidatesPage() {
   const queryClient = useQueryClient();
   const list = useListPage();
   const session = useAuthStore((state) => state.session);
-  const { catalog } = useSettingsCatalog();
+  const { catalog, defaults } = useSettingsCatalog();
+  const resizeStateRef = useRef<{ key: string; startX: number; startWidth: number; minWidth: number } | null>(null);
 
   const [form, setForm] = useState<CandidateForm>({ ...EMPTY_CANDIDATE_FORM });
   const [resumeFile, setResumeFile] = useState<File | null>(null);
@@ -82,6 +149,15 @@ export default function CandidatesPage() {
   const [error, setError] = useState<string | null>(null);
   const [previewCandidateId, setPreviewCandidateId] = useState<number | null>(null);
   const [previewTab, setPreviewTab] = useState<CandidatePreviewTab>("details");
+  const [visibleColumnKeys] = useState<ToggleableCandidateColumnKey[]>(
+    DEFAULT_VISIBLE_CANDIDATE_COLUMNS,
+  );
+  const [columnWidths, setColumnWidths] = useState<Record<string, number>>(() =>
+    Object.fromEntries(
+      Object.entries(CANDIDATE_COLUMN_DIMENSIONS).map(([key, value]) => [key, value.defaultWidth]),
+    ),
+  );
+  const [activeResizeKey, setActiveResizeKey] = useState<string | null>(null);
 
   const ownerName = useMemo(() => {
     const full = `${session?.user?.first_name ?? ""} ${session?.user?.last_name ?? ""}`.trim();
@@ -105,6 +181,29 @@ export default function CandidatesPage() {
   const groupBuOptions = useMemo(
     () => catalog.group_bu,
     [catalog.group_bu],
+  );
+  const defaultCreateForm = useMemo<CandidateForm>(
+    () => ({
+      ...EMPTY_CANDIDATE_FORM,
+      status: defaults.candidate_status || candidateStatusOptions[0] || EMPTY_CANDIDATE_FORM.status,
+      groupBu: defaults.group_bu || "",
+      bdm: defaults.bdm || "",
+      role: defaults.candidate_role || "",
+      employeeType:
+        defaults.candidate_employee_type || candidateEmployeeTypeOptions[0] || EMPTY_CANDIDATE_FORM.employeeType,
+      source: defaults.candidate_source || candidateSourceOptions[0] || EMPTY_CANDIDATE_FORM.source,
+    }),
+    [
+      candidateEmployeeTypeOptions,
+      candidateSourceOptions,
+      candidateStatusOptions,
+      defaults.bdm,
+      defaults.candidate_employee_type,
+      defaults.candidate_role,
+      defaults.candidate_source,
+      defaults.candidate_status,
+      defaults.group_bu,
+    ],
   );
 
   const { data, isLoading } = useQuery({
@@ -135,6 +234,73 @@ export default function CandidatesPage() {
     setPreviewTab("details");
   }, [candidateItems, previewCandidateId]);
 
+  useEffect(() => {
+    if (!activeResizeKey) return;
+
+    const onMouseMove = (event: MouseEvent) => {
+      const state = resizeStateRef.current;
+      if (!state) return;
+
+      const nextWidth = Math.max(state.minWidth, state.startWidth + event.clientX - state.startX);
+      setColumnWidths((prev) => (
+        prev[state.key] === nextWidth
+          ? prev
+          : { ...prev, [state.key]: nextWidth }
+      ));
+    };
+
+    const onMouseUp = () => {
+      resizeStateRef.current = null;
+      setActiveResizeKey(null);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    };
+
+    window.addEventListener("mousemove", onMouseMove);
+    window.addEventListener("mouseup", onMouseUp);
+
+    return () => {
+      window.removeEventListener("mousemove", onMouseMove);
+      window.removeEventListener("mouseup", onMouseUp);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    };
+  }, [activeResizeKey]);
+
+  useEffect(() => {
+    setForm((prev) => {
+      const next = { ...prev };
+      let changed = false;
+
+      if (prev.status === EMPTY_CANDIDATE_FORM.status) {
+        next.status = defaultCreateForm.status;
+        changed = true;
+      }
+      if (prev.groupBu === "") {
+        next.groupBu = defaultCreateForm.groupBu;
+        changed = true;
+      }
+      if (prev.bdm === "") {
+        next.bdm = defaultCreateForm.bdm;
+        changed = true;
+      }
+      if (prev.role === "") {
+        next.role = defaultCreateForm.role;
+        changed = true;
+      }
+      if (prev.employeeType === EMPTY_CANDIDATE_FORM.employeeType) {
+        next.employeeType = defaultCreateForm.employeeType;
+        changed = true;
+      }
+      if (prev.source === EMPTY_CANDIDATE_FORM.source) {
+        next.source = defaultCreateForm.source;
+        changed = true;
+      }
+
+      return changed ? next : prev;
+    });
+  }, [defaultCreateForm]);
+
   const selectedCandidateFromList = useMemo(
     () => candidateItems.find((item) => item.id === previewCandidateId) ?? null,
     [candidateItems, previewCandidateId],
@@ -147,10 +313,270 @@ export default function CandidatesPage() {
     return full || "Candidate";
   }, [previewCandidate?.first_name, previewCandidate?.last_name, selectedCandidateFromList?.first_name, selectedCandidateFromList?.last_name]);
 
-  const previewStatusLabel = previewCandidate?.deleted_at ? "Deleted" : "Active";
-
   const pagination = list.getPagination(data?.total ?? 0);
   const selection = list.getSelectionHelpers(candidateItems);
+  const visibleColumnKeySet = useMemo(() => new Set(visibleColumnKeys), [visibleColumnKeys]);
+  const isApplicationsColumnVisible = visibleColumnKeySet.has("applications");
+  const applicationCountQueries = useQueries({
+    queries: isApplicationsColumnVisible
+      ? candidateItems.map((candidate) => ({
+          queryKey: queryKeys.jobs.candidateApplications(candidate.id, 1),
+          queryFn: () => listCandidateJobApplications(candidate.id, { page: 1, pageSize: 1 }),
+          staleTime: 60_000,
+        }))
+      : [],
+  });
+  const applicationCounts = useMemo(() => {
+    const counts = new Map<number, number>();
+
+    candidateItems.forEach((candidate, index) => {
+      const total = applicationCountQueries[index]?.data?.total;
+      if (typeof total === "number") {
+        counts.set(candidate.id, total);
+      }
+    });
+
+    return counts;
+  }, [applicationCountQueries, candidateItems]);
+  const applicationQueryStateByCandidateId = useMemo(() => {
+    const queryStates = new Map<number, (typeof applicationCountQueries)[number]>();
+
+    candidateItems.forEach((candidate, index) => {
+      const queryState = applicationCountQueries[index];
+      if (queryState) {
+        queryStates.set(candidate.id, queryState);
+      }
+    });
+
+    return queryStates;
+  }, [applicationCountQueries, candidateItems]);
+
+  const renderCompactText = (value: string | null | undefined, emptyValue = "-") =>
+    value ? (
+      <span className="block w-full truncate" title={value}>
+        {value}
+      </span>
+    ) : (
+      emptyValue
+    );
+  const getColumnWidth = (column: CandidateTableColumn) =>
+    columnWidths[column.key] ?? column.defaultWidth;
+  const startColumnResize = (event: React.MouseEvent<HTMLDivElement>, column: CandidateTableColumn) => {
+    event.preventDefault();
+    event.stopPropagation();
+
+    resizeStateRef.current = {
+      key: column.key,
+      startX: event.clientX,
+      startWidth: getColumnWidth(column),
+      minWidth: column.minWidth,
+    };
+    setActiveResizeKey(column.key);
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+  };
+
+  const candidateTableColumns: CandidateTableColumn[] = [
+    {
+      key: "selection",
+      defaultWidth: CANDIDATE_COLUMN_DIMENSIONS.selection.defaultWidth,
+      minWidth: CANDIDATE_COLUMN_DIMENSIONS.selection.minWidth,
+      header: (
+        <input
+          type="checkbox"
+          checked={selection.allSelected}
+          onChange={selection.toggleSelectAll}
+          aria-label="Select all candidates"
+        />
+      ),
+      headerClassName: "w-16 px-3 py-2",
+      cellClassName: "px-3 py-2",
+      render: (candidate) => (
+        <div className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            checked={list.selectedIds.has(candidate.id)}
+            onChange={() => selection.toggleSelectOne(candidate.id)}
+            aria-label={`Select candidate ${candidate.first_name} ${candidate.last_name}`}
+          />
+          <button
+            type="button"
+            onClick={() => {
+              setPreviewCandidateId(candidate.id);
+              setPreviewTab("details");
+            }}
+            className={cn(
+              "text-slate-500 hover:text-blue-700",
+              previewCandidateId === candidate.id && "text-blue-700",
+            )}
+            aria-label={`Open preview for candidate ${candidate.first_name} ${candidate.last_name}`}
+          >
+            <Binoculars className="size-4" />
+          </button>
+        </div>
+      ),
+    },
+    {
+      key: "id",
+      defaultWidth: CANDIDATE_COLUMN_DIMENSIONS.id.defaultWidth,
+      minWidth: CANDIDATE_COLUMN_DIMENSIONS.id.minWidth,
+      toggleableKey: "id",
+      header: "ID",
+      headerClassName: "px-3 py-2 font-medium text-slate-600",
+      cellClassName: "px-3 py-2 tabular-nums text-slate-800",
+      render: (candidate) => candidate.id,
+    },
+    {
+      key: "firstName",
+      defaultWidth: CANDIDATE_COLUMN_DIMENSIONS.firstName.defaultWidth,
+      minWidth: CANDIDATE_COLUMN_DIMENSIONS.firstName.minWidth,
+      toggleableKey: "firstName",
+      header: "First Name",
+      headerClassName: "px-3 py-2 font-medium text-slate-600",
+      cellClassName: "px-3 py-2",
+      render: (candidate) => (
+        <Link href={`/candidates/${candidate.id}`} className="font-medium text-blue-700 hover:underline">
+          {candidate.first_name}
+        </Link>
+      ),
+    },
+    {
+      key: "lastName",
+      defaultWidth: CANDIDATE_COLUMN_DIMENSIONS.lastName.defaultWidth,
+      minWidth: CANDIDATE_COLUMN_DIMENSIONS.lastName.minWidth,
+      toggleableKey: "lastName",
+      header: "Last Name",
+      headerClassName: "px-3 py-2 font-medium text-slate-600",
+      cellClassName: "px-3 py-2",
+      render: (candidate) => (
+        <Link href={`/candidates/${candidate.id}`} className="font-medium text-blue-700 hover:underline">
+          {candidate.last_name}
+        </Link>
+      ),
+    },
+    {
+      key: "status",
+      defaultWidth: CANDIDATE_COLUMN_DIMENSIONS.status.defaultWidth,
+      minWidth: CANDIDATE_COLUMN_DIMENSIONS.status.minWidth,
+      toggleableKey: "status",
+      header: "Status",
+      headerClassName: "px-3 py-2 font-medium text-slate-600",
+      cellClassName: "px-3 py-2",
+      render: (candidate) => <StatusChip value={candidate.deleted_at ? "deleted" : "active"} />,
+    },
+    {
+      key: "groupBu",
+      defaultWidth: CANDIDATE_COLUMN_DIMENSIONS.groupBu.defaultWidth,
+      minWidth: CANDIDATE_COLUMN_DIMENSIONS.groupBu.minWidth,
+      toggleableKey: "groupBu",
+      header: "Group (BU)",
+      headerClassName: "px-3 py-2 font-medium text-slate-600",
+      cellClassName: "px-3 py-2 text-slate-700",
+      render: (candidate) => candidate.group_bu ?? "-",
+    },
+    {
+      key: "currentCompany",
+      defaultWidth: CANDIDATE_COLUMN_DIMENSIONS.currentCompany.defaultWidth,
+      minWidth: CANDIDATE_COLUMN_DIMENSIONS.currentCompany.minWidth,
+      toggleableKey: "currentCompany",
+      header: "Current Company",
+      headerClassName: "px-3 py-2 font-medium text-slate-600",
+      cellClassName: "px-3 py-2 text-slate-700",
+      render: (candidate) => renderCompactText(candidate.current_company),
+    },
+    {
+      key: "ownerUserId",
+      defaultWidth: CANDIDATE_COLUMN_DIMENSIONS.ownerUserId.defaultWidth,
+      minWidth: CANDIDATE_COLUMN_DIMENSIONS.ownerUserId.minWidth,
+      toggleableKey: "ownerUserId",
+      header: "Owner",
+      headerClassName: "px-3 py-2 font-medium text-slate-600",
+      cellClassName: "px-3 py-2 tabular-nums text-slate-700",
+      render: (candidate) => candidate.owner_user_id,
+    },
+    {
+      key: "dedupeFingerprint",
+      defaultWidth: CANDIDATE_COLUMN_DIMENSIONS.dedupeFingerprint.defaultWidth,
+      minWidth: CANDIDATE_COLUMN_DIMENSIONS.dedupeFingerprint.minWidth,
+      toggleableKey: "dedupeFingerprint",
+      header: "Dedupe Fingerprint",
+      headerClassName: "px-3 py-2 font-medium text-slate-600",
+      cellClassName: "px-3 py-2 text-slate-700",
+      render: (candidate) => renderCompactText(candidate.dedupe_fingerprint),
+    },
+    {
+      key: "generalNotes",
+      defaultWidth: CANDIDATE_COLUMN_DIMENSIONS.generalNotes.defaultWidth,
+      minWidth: CANDIDATE_COLUMN_DIMENSIONS.generalNotes.minWidth,
+      toggleableKey: "generalNotes",
+      header: "General Notes",
+      headerClassName: "px-3 py-2 font-medium text-slate-600",
+      cellClassName: "px-3 py-2 text-slate-700",
+      render: (candidate) => renderCompactText(candidate.hr_notes_general),
+    },
+    {
+      key: "statusNotes",
+      defaultWidth: CANDIDATE_COLUMN_DIMENSIONS.statusNotes.defaultWidth,
+      minWidth: CANDIDATE_COLUMN_DIMENSIONS.statusNotes.minWidth,
+      toggleableKey: "statusNotes",
+      header: "Status Notes",
+      headerClassName: "px-3 py-2 font-medium text-slate-600",
+      cellClassName: "px-3 py-2 text-slate-700",
+      render: (candidate) => renderCompactText(candidate.hr_notes_status),
+    },
+    {
+      key: "payNotes",
+      defaultWidth: CANDIDATE_COLUMN_DIMENSIONS.payNotes.defaultWidth,
+      minWidth: CANDIDATE_COLUMN_DIMENSIONS.payNotes.minWidth,
+      toggleableKey: "payNotes",
+      header: "Pay Notes",
+      headerClassName: "px-3 py-2 font-medium text-slate-600",
+      cellClassName: "px-3 py-2 text-slate-700",
+      render: (candidate) => renderCompactText(candidate.hr_notes_pay),
+    },
+    {
+      key: "otherNotes",
+      defaultWidth: CANDIDATE_COLUMN_DIMENSIONS.otherNotes.defaultWidth,
+      minWidth: CANDIDATE_COLUMN_DIMENSIONS.otherNotes.minWidth,
+      toggleableKey: "otherNotes",
+      header: "Other Notes",
+      headerClassName: "px-3 py-2 font-medium text-slate-600",
+      cellClassName: "px-3 py-2 text-slate-700",
+      render: (candidate) => renderCompactText(candidate.hr_notes_notes),
+    },
+    {
+      key: "deletedAt",
+      defaultWidth: CANDIDATE_COLUMN_DIMENSIONS.deletedAt.defaultWidth,
+      minWidth: CANDIDATE_COLUMN_DIMENSIONS.deletedAt.minWidth,
+      toggleableKey: "deletedAt",
+      header: "Deleted At",
+      headerClassName: "px-3 py-2 font-medium text-slate-600",
+      cellClassName: "px-3 py-2 text-slate-700",
+      render: (candidate) => renderCompactText(candidate.deleted_at),
+    },
+    {
+      key: "applications",
+      defaultWidth: CANDIDATE_COLUMN_DIMENSIONS.applications.defaultWidth,
+      minWidth: CANDIDATE_COLUMN_DIMENSIONS.applications.minWidth,
+      toggleableKey: "applications",
+      header: "Applications",
+      headerClassName: "px-3 py-2 font-medium text-slate-600",
+      cellClassName: "px-3 py-2 text-slate-700",
+      render: (candidate) => {
+        const query = applicationQueryStateByCandidateId.get(candidate.id);
+        if (query?.isLoading) return "...";
+        if (query?.isError) return "-";
+        return applicationCounts.get(candidate.id) ?? 0;
+      },
+    },
+  ];
+  const visibleCandidateTableColumns = candidateTableColumns.filter(
+    (column) => !column.toggleableKey || visibleColumnKeySet.has(column.toggleableKey),
+  );
+  const visibleTableMinWidth = visibleCandidateTableColumns.reduce(
+    (total, column) => total + getColumnWidth(column),
+    0,
+  );
 
   const createMutation = useMutation({
     mutationFn: createCandidate,
@@ -168,14 +594,8 @@ export default function CandidatesPage() {
     onError: (err) => setError(getApiErrorMessage(err, "Failed to extract details from resume")),
   });
 
-  const restoreMutation = useMutation({
-    mutationFn: restoreCandidate,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.candidates.all }),
-    onError: (err) => setError(getApiErrorMessage(err, "Failed to restore candidate")),
-  });
-
   const resetCreateForm = () => {
-    setForm({ ...EMPTY_CANDIDATE_FORM });
+    setForm({ ...defaultCreateForm });
     setResumeFile(null);
     setExtractMessage(null);
   };
@@ -305,6 +725,10 @@ export default function CandidatesPage() {
     { id: "experience", label: "Experience" },
   ];
 
+  const kvRowClass = "grid grid-cols-2 border-b border-slate-200 px-3 py-2 text-sm";
+  const kvLabelClass = "text-slate-500";
+  const kvValueClass = "text-slate-900";
+
   const createFormContent = (
     <div className="overflow-hidden rounded border border-slate-200 bg-white">
       <form className="grid xl:grid-cols-[minmax(0,1.65fr)_minmax(0,1fr)]" onSubmit={onCreate}>
@@ -319,26 +743,26 @@ export default function CandidatesPage() {
               <div className={sectionTitleClass}>Candidate</div>
               <div className={sectionBodyClass}>
                 <div className={rowClass}>
-                  <label className={labelClass}>
+                  <label htmlFor="cand-first-name" className={labelClass}>
                     First Name <span className="text-red-600">*</span>
                   </label>
-                  <Input className={LINE_INPUT_CLASS} value={form.firstName} onChange={(e) => onChangeField("firstName", e.target.value)} required />
+                  <Input id="cand-first-name" className={LINE_INPUT_CLASS} value={form.firstName} onChange={(e) => onChangeField("firstName", e.target.value)} required />
                 </div>
                 <div className={rowClass}>
-                  <label className={labelClass}>Middle Name</label>
-                  <Input className={LINE_INPUT_CLASS} value={form.middleName} onChange={(e) => onChangeField("middleName", e.target.value)} />
+                  <label htmlFor="cand-middle-name" className={labelClass}>Middle Name</label>
+                  <Input id="cand-middle-name" className={LINE_INPUT_CLASS} value={form.middleName} onChange={(e) => onChangeField("middleName", e.target.value)} />
                 </div>
                 <div className={rowClass}>
-                  <label className={labelClass}>
+                  <label htmlFor="cand-last-name" className={labelClass}>
                     Last Name <span className="text-red-600">*</span>
                   </label>
-                  <Input className={LINE_INPUT_CLASS} value={form.lastName} onChange={(e) => onChangeField("lastName", e.target.value)} required />
+                  <Input id="cand-last-name" className={LINE_INPUT_CLASS} value={form.lastName} onChange={(e) => onChangeField("lastName", e.target.value)} required />
                 </div>
                 <div className={rowClass}>
-                  <label className={labelClass}>
+                  <label htmlFor="cand-status" className={labelClass}>
                     Status <span className="text-red-600">*</span>
                   </label>
-                  <Select className={LINE_INPUT_CLASS} value={form.status} onChange={(e) => onChangeField("status", e.target.value)}>
+                  <Select id="cand-status" className={LINE_INPUT_CLASS} value={form.status} onChange={(e) => onChangeField("status", e.target.value)}>
                     {candidateStatusOptions.map((option) => (
                       <option key={option} value={option}>
                         {toTitleCase(option.replace(/_/g, " "))}
@@ -347,8 +771,8 @@ export default function CandidatesPage() {
                   </Select>
                 </div>
                 <div className={rowClass}>
-                  <label className={labelClass}>Group (BU)</label>
-                  <Select className={LINE_INPUT_CLASS} value={form.groupBu} onChange={(e) => onChangeField("groupBu", e.target.value)}>
+                  <label htmlFor="cand-group-bu" className={labelClass}>Group (BU)</label>
+                  <Select id="cand-group-bu" className={LINE_INPUT_CLASS} value={form.groupBu} onChange={(e) => onChangeField("groupBu", e.target.value)}>
                     <option value="">{groupBuOptions.length > 0 ? "Select Group (BU)" : "No Group (BU) configured"}</option>
                     {groupBuOptions.map((option) => (
                       <option key={option} value={option}>
@@ -358,24 +782,24 @@ export default function CandidatesPage() {
                   </Select>
                 </div>
                 <div className={rowClass}>
-                  <label className={labelClass}>BDM</label>
-                  <Input className={LINE_INPUT_CLASS} value={form.bdm} onChange={(e) => onChangeField("bdm", e.target.value)} />
+                  <label htmlFor="cand-bdm" className={labelClass}>BDM</label>
+                  <Input id="cand-bdm" className={LINE_INPUT_CLASS} value={form.bdm} onChange={(e) => onChangeField("bdm", e.target.value)} />
                 </div>
                 <div className={rowClass}>
-                  <label className={labelClass}>Role</label>
-                  <Input className={LINE_INPUT_CLASS} value={form.role} onChange={(e) => onChangeField("role", e.target.value)} />
+                  <label htmlFor="cand-role" className={labelClass}>Role</label>
+                  <Input id="cand-role" className={LINE_INPUT_CLASS} value={form.role} onChange={(e) => onChangeField("role", e.target.value)} />
                 </div>
                 <div className={rowClass}>
-                  <label className={labelClass}>Current Company</label>
+                  <label htmlFor="cand-current-company" className={labelClass}>Current Company</label>
                   <div>
-                    <Input className={LINE_INPUT_CLASS} value={form.currentCompany} onChange={(e) => onChangeField("currentCompany", e.target.value)} />
+                    <Input id="cand-current-company" className={LINE_INPUT_CLASS} value={form.currentCompany} onChange={(e) => onChangeField("currentCompany", e.target.value)} />
                   </div>
                 </div>
                 <div className={rowClass}>
-                  <label className={labelClass}>
+                  <label htmlFor="cand-employee-type" className={labelClass}>
                     Employee Type <span className="text-red-600">*</span>
                   </label>
-                  <Select className={LINE_INPUT_CLASS} value={form.employeeType} onChange={(e) => onChangeField("employeeType", e.target.value)}>
+                  <Select id="cand-employee-type" className={LINE_INPUT_CLASS} value={form.employeeType} onChange={(e) => onChangeField("employeeType", e.target.value)}>
                     {candidateEmployeeTypeOptions.map((option) => (
                       <option key={option} value={option}>
                         {toTitleCase(option.replace(/_/g, " "))}
@@ -384,10 +808,10 @@ export default function CandidatesPage() {
                   </Select>
                 </div>
                 <div className={rowClass}>
-                  <label className={labelClass}>
+                  <label htmlFor="cand-source" className={labelClass}>
                     Source <span className="text-red-600">*</span>
                   </label>
-                  <Select className={LINE_INPUT_CLASS} value={form.source} onChange={(e) => onChangeField("source", e.target.value)}>
+                  <Select id="cand-source" className={LINE_INPUT_CLASS} value={form.source} onChange={(e) => onChangeField("source", e.target.value)}>
                     {candidateSourceOptions.map((option) => (
                       <option key={option} value={option}>
                         {toTitleCase(option.replace(/_/g, " "))}
@@ -396,16 +820,16 @@ export default function CandidatesPage() {
                   </Select>
                 </div>
                 <div className={rowClass}>
-                  <label className={labelClass}>Referred By</label>
-                  <Input className={LINE_INPUT_CLASS} value={form.referredBy} onChange={(e) => onChangeField("referredBy", e.target.value)} />
+                  <label htmlFor="cand-referred-by" className={labelClass}>Referred By</label>
+                  <Input id="cand-referred-by" className={LINE_INPUT_CLASS} value={form.referredBy} onChange={(e) => onChangeField("referredBy", e.target.value)} />
                 </div>
                 <div className={rowClass}>
-                  <label className={labelClass}>Referred By (Other)</label>
-                  <Input className={LINE_INPUT_CLASS} value={form.referredByOther} onChange={(e) => onChangeField("referredByOther", e.target.value)} />
+                  <label htmlFor="cand-referred-by-other" className={labelClass}>Referred By (Other)</label>
+                  <Input id="cand-referred-by-other" className={LINE_INPUT_CLASS} value={form.referredByOther} onChange={(e) => onChangeField("referredByOther", e.target.value)} />
                 </div>
                 <div className={rowClass}>
-                  <label className={labelClass}>Ownership</label>
-                  <Input className={LINE_INPUT_CLASS} value={ownerName} readOnly />
+                  <label htmlFor="cand-ownership" className={labelClass}>Ownership</label>
+                  <Input id="cand-ownership" className={LINE_INPUT_CLASS} value={ownerName} readOnly />
                 </div>
               </div>
             </section>
@@ -414,40 +838,40 @@ export default function CandidatesPage() {
               <div className={sectionTitleClass}>Contact Information</div>
               <div className={sectionBodyClass}>
                 <div className={rowClass}>
-                  <label className={labelClass}>
+                  <label htmlFor="cand-email-1" className={labelClass}>
                     Email 1 <span className="text-red-600">*</span>
                   </label>
-                  <Input className={LINE_INPUT_CLASS} type="email" value={form.email1} onChange={(e) => onChangeField("email1", e.target.value)} />
+                  <Input id="cand-email-1" className={LINE_INPUT_CLASS} type="email" value={form.email1} onChange={(e) => onChangeField("email1", e.target.value)} />
                 </div>
                 <div className={rowClass}>
-                  <label className={labelClass}>Email 2</label>
-                  <Input className={LINE_INPUT_CLASS} type="email" value={form.email2} onChange={(e) => onChangeField("email2", e.target.value)} />
+                  <label htmlFor="cand-email-2" className={labelClass}>Email 2</label>
+                  <Input id="cand-email-2" className={LINE_INPUT_CLASS} type="email" value={form.email2} onChange={(e) => onChangeField("email2", e.target.value)} />
                 </div>
                 <div className={rowClass}>
-                  <label className={labelClass}>Primary Phone</label>
-                  <Input className={LINE_INPUT_CLASS} value={form.primaryPhone} onChange={(e) => onChangeField("primaryPhone", e.target.value)} />
+                  <label htmlFor="cand-primary-phone" className={labelClass}>Primary Phone</label>
+                  <Input id="cand-primary-phone" className={LINE_INPUT_CLASS} value={form.primaryPhone} onChange={(e) => onChangeField("primaryPhone", e.target.value)} />
                 </div>
                 <div className={rowClass}>
-                  <label className={labelClass}>Work Phone</label>
-                  <Input className={LINE_INPUT_CLASS} value={form.workPhone} onChange={(e) => onChangeField("workPhone", e.target.value)} />
+                  <label htmlFor="cand-work-phone" className={labelClass}>Work Phone</label>
+                  <Input id="cand-work-phone" className={LINE_INPUT_CLASS} value={form.workPhone} onChange={(e) => onChangeField("workPhone", e.target.value)} />
                 </div>
                 <div className={rowClass}>
-                  <label className={labelClass}>Mobile Phone</label>
-                  <Input className={LINE_INPUT_CLASS} value={form.mobilePhone} onChange={(e) => onChangeField("mobilePhone", e.target.value)} />
+                  <label htmlFor="cand-mobile-phone" className={labelClass}>Mobile Phone</label>
+                  <Input id="cand-mobile-phone" className={LINE_INPUT_CLASS} value={form.mobilePhone} onChange={(e) => onChangeField("mobilePhone", e.target.value)} />
                 </div>
                 <div className={rowClass}>
-                  <label className={labelClass}>Other Phone</label>
-                  <Input className={LINE_INPUT_CLASS} value={form.otherPhone} onChange={(e) => onChangeField("otherPhone", e.target.value)} />
+                  <label htmlFor="cand-other-phone" className={labelClass}>Other Phone</label>
+                  <Input id="cand-other-phone" className={LINE_INPUT_CLASS} value={form.otherPhone} onChange={(e) => onChangeField("otherPhone", e.target.value)} />
                 </div>
                 <div className={rowClass}>
-                  <label className={labelClass}>Address</label>
+                  <label htmlFor="cand-address-1" className={labelClass}>Address</label>
                   <div className="grid gap-2 sm:grid-cols-2">
-                    <Input className={LINE_INPUT_CLASS} placeholder="Address 1" value={form.address1} onChange={(e) => onChangeField("address1", e.target.value)} />
-                    <Input className={LINE_INPUT_CLASS} placeholder="Address 2" value={form.address2} onChange={(e) => onChangeField("address2", e.target.value)} />
-                    <Input className={LINE_INPUT_CLASS} placeholder="City" value={form.city} onChange={(e) => onChangeField("city", e.target.value)} />
-                    <Input className={LINE_INPUT_CLASS} placeholder="State" value={form.state} onChange={(e) => onChangeField("state", e.target.value)} />
-                    <Input className={LINE_INPUT_CLASS} placeholder="Zip" value={form.zip} onChange={(e) => onChangeField("zip", e.target.value)} />
-                    <Input className={LINE_INPUT_CLASS} placeholder="Country" value={form.country} onChange={(e) => onChangeField("country", e.target.value)} />
+                    <Input id="cand-address-1" className={LINE_INPUT_CLASS} placeholder="Address 1" value={form.address1} onChange={(e) => onChangeField("address1", e.target.value)} />
+                    <Input id="cand-address-2" className={LINE_INPUT_CLASS} placeholder="Address 2" value={form.address2} onChange={(e) => onChangeField("address2", e.target.value)} />
+                    <Input id="cand-city" className={LINE_INPUT_CLASS} placeholder="City" value={form.city} onChange={(e) => onChangeField("city", e.target.value)} />
+                    <Input id="cand-state" className={LINE_INPUT_CLASS} placeholder="State" value={form.state} onChange={(e) => onChangeField("state", e.target.value)} />
+                    <Input id="cand-zip" className={LINE_INPUT_CLASS} placeholder="Zip" value={form.zip} onChange={(e) => onChangeField("zip", e.target.value)} />
+                    <Input id="cand-country" className={LINE_INPUT_CLASS} placeholder="Country" value={form.country} onChange={(e) => onChangeField("country", e.target.value)} />
                   </div>
                 </div>
               </div>
@@ -457,63 +881,66 @@ export default function CandidatesPage() {
               <div className={sectionTitleClass}>Comments</div>
               <div className={sectionBodyClass}>
                 <div className={rowClass}>
-                  <label className={labelClass}>Employment Preference</label>
-                  <Input className={LINE_INPUT_CLASS} value={form.employmentPreference} onChange={(e) => onChangeField("employmentPreference", e.target.value)} />
+                  <label htmlFor="cand-employment-preference" className={labelClass}>Employment Preference</label>
+                  <Input id="cand-employment-preference" className={LINE_INPUT_CLASS} value={form.employmentPreference} onChange={(e) => onChangeField("employmentPreference", e.target.value)} />
                 </div>
                 <div className={rowClass}>
-                  <label className={labelClass}>Base Salary</label>
-                  <Input className={LINE_INPUT_CLASS} value={form.baseSalary} onChange={(e) => onChangeField("baseSalary", e.target.value)} placeholder="USD / INR" />
+                  <label htmlFor="cand-base-salary" className={labelClass}>Base Salary</label>
+                  <Input id="cand-base-salary" className={LINE_INPUT_CLASS} value={form.baseSalary} onChange={(e) => onChangeField("baseSalary", e.target.value)} placeholder="USD / INR" />
                 </div>
                 <div className={rowClass}>
-                  <label className={labelClass}>Desired Salary</label>
-                  <Input className={LINE_INPUT_CLASS} value={form.desiredSalary} onChange={(e) => onChangeField("desiredSalary", e.target.value)} placeholder="USD / INR" />
+                  <label htmlFor="cand-desired-salary" className={labelClass}>Desired Salary</label>
+                  <Input id="cand-desired-salary" className={LINE_INPUT_CLASS} value={form.desiredSalary} onChange={(e) => onChangeField("desiredSalary", e.target.value)} placeholder="USD / INR" />
                 </div>
                 <div className={rowClass}>
-                  <label className={labelClass}>Current Pay Rate</label>
-                  <Input className={LINE_INPUT_CLASS} value={form.currentPayRate} onChange={(e) => onChangeField("currentPayRate", e.target.value)} placeholder="USD / INR" />
+                  <label htmlFor="cand-current-pay-rate" className={labelClass}>Current Pay Rate</label>
+                  <Input id="cand-current-pay-rate" className={LINE_INPUT_CLASS} value={form.currentPayRate} onChange={(e) => onChangeField("currentPayRate", e.target.value)} placeholder="USD / INR" />
                 </div>
                 <div className={rowClass}>
-                  <label className={labelClass}>Desired Pay Rate</label>
-                  <Input className={LINE_INPUT_CLASS} value={form.desiredPayRate} onChange={(e) => onChangeField("desiredPayRate", e.target.value)} placeholder="USD / INR" />
+                  <label htmlFor="cand-desired-pay-rate" className={labelClass}>Desired Pay Rate</label>
+                  <Input id="cand-desired-pay-rate" className={LINE_INPUT_CLASS} value={form.desiredPayRate} onChange={(e) => onChangeField("desiredPayRate", e.target.value)} placeholder="USD / INR" />
                 </div>
                 <div className={rowClass}>
-                  <label className={labelClass}>Employment Start Date</label>
-                  <Input className={LINE_INPUT_CLASS} type="date" value={form.employmentStartDate} onChange={(e) => onChangeField("employmentStartDate", e.target.value)} />
+                  <label htmlFor="cand-employment-start-date" className={labelClass}>Employment Start Date</label>
+                  <Input id="cand-employment-start-date" className={LINE_INPUT_CLASS} type="date" value={form.employmentStartDate} onChange={(e) => onChangeField("employmentStartDate", e.target.value)} />
                 </div>
                 <div className={rowClass}>
-                  <label className={labelClass}>Project Start Date</label>
-                  <Input className={LINE_INPUT_CLASS} type="date" value={form.projectStartDate} onChange={(e) => onChangeField("projectStartDate", e.target.value)} />
+                  <label htmlFor="cand-project-start-date" className={labelClass}>Project Start Date</label>
+                  <Input id="cand-project-start-date" className={LINE_INPUT_CLASS} type="date" value={form.projectStartDate} onChange={(e) => onChangeField("projectStartDate", e.target.value)} />
                 </div>
                 <div className={rowClass}>
-                  <label className={labelClass}>Desired Locations</label>
-                  <Input className={LINE_INPUT_CLASS} value={form.desiredLocations} onChange={(e) => onChangeField("desiredLocations", e.target.value)} />
+                  <label htmlFor="cand-desired-locations" className={labelClass}>Desired Locations</label>
+                  <Input id="cand-desired-locations" className={LINE_INPUT_CLASS} value={form.desiredLocations} onChange={(e) => onChangeField("desiredLocations", e.target.value)} />
                 </div>
                 <div className={rowClass}>
-                  <label className={labelClass}>Willing To Relocate</label>
-                  <div className="flex items-center gap-4 text-sm">
-                    <label className="inline-flex items-center gap-1">
-                      <input
-                        type="radio"
-                        name="willing-to-relocate"
-                        checked={form.willingToRelocate === "no"}
-                        onChange={() => onChangeField("willingToRelocate", "no")}
-                      />
-                      No
-                    </label>
-                    <label className="inline-flex items-center gap-1">
-                      <input
-                        type="radio"
-                        name="willing-to-relocate"
-                        checked={form.willingToRelocate === "yes"}
-                        onChange={() => onChangeField("willingToRelocate", "yes")}
-                      />
-                      Yes
-                    </label>
-                  </div>
+                  <fieldset>
+                    <legend className="text-sm font-medium text-slate-700">Willing to Relocate</legend>
+                    <div className="flex items-center gap-4 text-sm">
+                      <label className="inline-flex items-center gap-1">
+                        <input
+                          type="radio"
+                          name="willing-to-relocate"
+                          checked={form.willingToRelocate === "no"}
+                          onChange={() => onChangeField("willingToRelocate", "no")}
+                        />
+                        No
+                      </label>
+                      <label className="inline-flex items-center gap-1">
+                        <input
+                          type="radio"
+                          name="willing-to-relocate"
+                          checked={form.willingToRelocate === "yes"}
+                          onChange={() => onChangeField("willingToRelocate", "yes")}
+                        />
+                        Yes
+                      </label>
+                    </div>
+                  </fieldset>
                 </div>
                 <div className={rowClass}>
-                  <label className={labelClass}>Comments</label>
+                  <label htmlFor="cand-comments" className={labelClass}>Comments</label>
                   <Textarea
+                    id="cand-comments"
                     className="min-h-20 rounded-none border-0 border-b border-slate-300 bg-transparent px-0 py-1 shadow-none focus-visible:ring-0"
                     value={form.comments}
                     onChange={(e) => onChangeField("comments", e.target.value)}
@@ -526,48 +953,50 @@ export default function CandidatesPage() {
               <div className={sectionTitleClass}>Category &amp; Skills</div>
               <div className={sectionBodyClass}>
                 <div className={rowClass}>
-                  <label className={labelClass}>Category</label>
-                  <Input className={LINE_INPUT_CLASS} value={form.category} onChange={(e) => onChangeField("category", e.target.value)} />
+                  <label htmlFor="cand-category" className={labelClass}>Category</label>
+                  <Input id="cand-category" className={LINE_INPUT_CLASS} value={form.category} onChange={(e) => onChangeField("category", e.target.value)} />
                 </div>
                 <div className={rowClass}>
-                  <label className={labelClass}>Skills</label>
-                  <Input className={LINE_INPUT_CLASS} value={form.skills} onChange={(e) => onChangeField("skills", e.target.value)} />
+                  <label htmlFor="cand-skills" className={labelClass}>Skills</label>
+                  <Input id="cand-skills" className={LINE_INPUT_CLASS} value={form.skills} onChange={(e) => onChangeField("skills", e.target.value)} />
                 </div>
                 <div className={rowClass}>
-                  <label className={labelClass}>Industry</label>
-                  <Input className={LINE_INPUT_CLASS} value={form.industry} onChange={(e) => onChangeField("industry", e.target.value)} />
+                  <label htmlFor="cand-industry" className={labelClass}>Industry</label>
+                  <Input id="cand-industry" className={LINE_INPUT_CLASS} value={form.industry} onChange={(e) => onChangeField("industry", e.target.value)} />
                 </div>
                 <div className={rowClass}>
-                  <label className={labelClass}>Schedule Next Action</label>
-                  <div className="flex flex-wrap items-center gap-4 text-sm">
-                    <label className="inline-flex items-center gap-1">
-                      <input
-                        type="radio"
-                        name="schedule-next-action"
-                        checked={form.scheduleNextAction === "none"}
-                        onChange={() => onChangeField("scheduleNextAction", "none")}
-                      />
-                      None
-                    </label>
-                    <label className="inline-flex items-center gap-1">
-                      <input
-                        type="radio"
-                        name="schedule-next-action"
-                        checked={form.scheduleNextAction === "submission"}
-                        onChange={() => onChangeField("scheduleNextAction", "submission")}
-                      />
-                      Add Submission
-                    </label>
-                    <label className="inline-flex items-center gap-1">
-                      <input
-                        type="radio"
-                        name="schedule-next-action"
-                        checked={form.scheduleNextAction === "client_submission"}
-                        onChange={() => onChangeField("scheduleNextAction", "client_submission")}
-                      />
-                      Add Client Submission
-                    </label>
-                  </div>
+                  <fieldset>
+                    <legend className="text-sm font-medium text-slate-700">Schedule Next Action</legend>
+                    <div className="flex flex-wrap items-center gap-4 text-sm">
+                      <label className="inline-flex items-center gap-1">
+                        <input
+                          type="radio"
+                          name="schedule-next-action"
+                          checked={form.scheduleNextAction === "none"}
+                          onChange={() => onChangeField("scheduleNextAction", "none")}
+                        />
+                        None
+                      </label>
+                      <label className="inline-flex items-center gap-1">
+                        <input
+                          type="radio"
+                          name="schedule-next-action"
+                          checked={form.scheduleNextAction === "submission"}
+                          onChange={() => onChangeField("scheduleNextAction", "submission")}
+                        />
+                        Add Submission
+                      </label>
+                      <label className="inline-flex items-center gap-1">
+                        <input
+                          type="radio"
+                          name="schedule-next-action"
+                          checked={form.scheduleNextAction === "client_submission"}
+                          onChange={() => onChangeField("scheduleNextAction", "client_submission")}
+                        />
+                        Add Client Submission
+                      </label>
+                    </div>
+                  </fieldset>
                 </div>
               </div>
             </section>
@@ -605,6 +1034,7 @@ export default function CandidatesPage() {
             {resumeFile ? <p className="text-xs text-slate-600">Selected file: {resumeFile.name}</p> : null}
             {extractMessage ? <p className="text-xs text-emerald-700">{extractMessage}</p> : null}
             <Textarea
+              id="cand-resume-text"
               className="min-h-44 text-sm"
               value={form.resumeText}
               onChange={(e) => onChangeField("resumeText", e.target.value)}
@@ -629,33 +1059,56 @@ export default function CandidatesPage() {
       showCreate={list.showCreate}
       onToggleCreate={list.toggleShowCreate}
       createForm={createFormContent}
-      error={<ErrorBanner message={error} />}
+      error={<ErrorBanner message={error} onDismiss={() => setError(null)} />}
       pagination={pagination}
     >
       <div className={cn("grid", previewCandidateId !== null ? "xl:grid-cols-[minmax(0,1fr)_36rem]" : "grid-cols-1")}>
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[1120px] border-collapse text-left text-sm">
+          <table
+            className="w-full table-fixed border-collapse text-left text-sm"
+            style={{ minWidth: `${visibleTableMinWidth}px` }}
+          >
+            <colgroup>
+              {visibleCandidateTableColumns.map((column) => (
+                <col key={column.key} style={{ width: `${getColumnWidth(column)}px` }} />
+              ))}
+            </colgroup>
             <thead className="sticky top-0 z-10 bg-white">
               <tr className="border-b border-slate-300">
-                <th className="w-16 px-3 py-2">
-                  <input type="checkbox" checked={selection.allSelected} onChange={selection.toggleSelectAll} aria-label="Select all candidates" />
-                </th>
-                <th className="w-24 px-3 py-2 font-medium text-slate-900">ID</th>
-                <th className="px-3 py-2 font-medium text-slate-900">Candidate Name</th>
-                <th className="w-72 px-3 py-2 font-medium text-slate-900">Email</th>
-                <th className="w-64 px-3 py-2 font-medium text-slate-900">Group (BU)</th>
-                <th className="w-52 px-3 py-2 font-medium text-slate-900">Phone</th>
-                <th className="w-64 px-3 py-2 font-medium text-slate-900">Current Company</th>
-                <th className="w-44 px-3 py-2 font-medium text-slate-900">Actions</th>
+                {visibleCandidateTableColumns.map((column) => (
+                  <th
+                    key={column.key}
+                    className={column.headerClassName}
+                    style={{ width: `${getColumnWidth(column)}px`, minWidth: `${getColumnWidth(column)}px` }}
+                  >
+                    <div className="group relative flex items-center pr-3">
+                      <div className="min-w-0 truncate">
+                        {column.header}
+                      </div>
+                      <div
+                        role="separator"
+                        aria-orientation="vertical"
+                        aria-label={`Resize ${typeof column.header === "string" ? column.header : "column"} column`}
+                        onMouseDown={(event) => startColumnResize(event, column)}
+                        className={cn(
+                          "absolute right-[-6px] top-[-1px] h-[calc(100%+2px)] w-3 cursor-col-resize select-none",
+                          activeResizeKey === column.key && "bg-sky-200/70",
+                        )}
+                      >
+                        <div className="mx-auto h-full w-px bg-transparent transition-colors group-hover:bg-slate-300" />
+                      </div>
+                    </div>
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody>
               {isLoading ? (
-                <tr><td className="px-3 py-4 text-slate-600" colSpan={8}>Loading...</td></tr>
+                <tr><td className="px-3 py-4 text-slate-600" colSpan={visibleCandidateTableColumns.length}>Loading...</td></tr>
               ) : null}
 
               {!isLoading && candidateItems.length === 0 ? (
-                <tr><td className="px-3 py-4 text-slate-600" colSpan={8}>No candidates found.</td></tr>
+                <tr><td className="px-3 py-4 text-slate-600" colSpan={visibleCandidateTableColumns.length}>No candidates found.</td></tr>
               ) : null}
 
               {candidateItems.map((candidate, index) => (
@@ -666,48 +1119,11 @@ export default function CandidatesPage() {
                     previewCandidateId === candidate.id && "bg-sky-100/80",
                   )}
                 >
-                  <td className="px-3 py-2">
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        checked={list.selectedIds.has(candidate.id)}
-                        onChange={() => selection.toggleSelectOne(candidate.id)}
-                        aria-label={`Select candidate ${candidate.first_name} ${candidate.last_name}`}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setPreviewCandidateId(candidate.id);
-                          setPreviewTab("details");
-                        }}
-                        className={cn(
-                          "text-slate-500 hover:text-blue-700",
-                          previewCandidateId === candidate.id && "text-blue-700",
-                        )}
-                        aria-label={`Open preview for candidate ${candidate.first_name} ${candidate.last_name}`}
-                      >
-                        <Binoculars className="size-4" />
-                      </button>
-                    </div>
-                  </td>
-                  <td className="px-3 py-2 tabular-nums text-slate-800">{candidate.id}</td>
-                  <td className="px-3 py-2">
-                    <Link href={`/candidates/${candidate.id}`} className="font-medium text-blue-700 hover:underline">
-                      {candidate.first_name} {candidate.last_name}
-                    </Link>
-                  </td>
-                  <td className="px-3 py-2 text-slate-800">{candidate.email ?? "-"}</td>
-                  <td className="px-3 py-2 text-slate-800">{candidate.group_bu ?? "-"}</td>
-                  <td className="px-3 py-2 text-slate-800">{candidate.phone ?? "-"}</td>
-                  <td className="px-3 py-2 text-slate-800">{candidate.current_company ?? "-"}</td>
-                  <td className="px-3 py-2">
-                    <div className="flex gap-2">
-                      <Link href={`/candidates/${candidate.id}/resumes`} className="text-blue-700 hover:underline">Resumes</Link>
-                      {candidate.deleted_at ? (
-                        <Button variant="secondary" onClick={() => restoreMutation.mutate(candidate.id)}>Restore</Button>
-                      ) : null}
-                    </div>
-                  </td>
+                  {visibleCandidateTableColumns.map((column) => (
+                    <td key={`${candidate.id}-${column.key}`} className={column.cellClassName}>
+                      {column.render(candidate)}
+                    </td>
+                  ))}
                 </tr>
               ))}
             </tbody>
@@ -718,19 +1134,22 @@ export default function CandidatesPage() {
           <aside className="border-l border-slate-300 bg-slate-50">
             <div className="border-b border-slate-200 bg-white px-4 py-3">
               <div className="flex items-start justify-between gap-3">
-                <div className="space-y-1">
+                <div className="min-w-0 space-y-1">
                   <div className="flex items-center gap-2 text-slate-900">
-                    <UserRound className="size-5 text-emerald-600" />
-                    <p className="text-balance text-4xl font-semibold leading-none">{previewFullName}</p>
+                    <UserRound className="size-5 shrink-0 text-emerald-600" />
+                    <p className="truncate text-lg font-semibold leading-tight">{previewFullName}</p>
                   </div>
-                  <p className="text-sm text-slate-500">Candidate ID: {previewCandidate?.id ?? previewCandidateId}</p>
+                  <div className="flex items-center gap-2">
+                    <p className="text-xs text-slate-500">ID: {previewCandidate?.id ?? previewCandidateId}</p>
+                    <StatusChip value={previewCandidate?.deleted_at ? "deleted" : "active"} />
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex shrink-0 items-center gap-2">
                   <Link
                     href={`/candidates/${previewCandidateId}`}
-                    className="inline-flex items-center rounded-md bg-ocean px-3 py-2 text-sm font-medium text-white hover:bg-blue-800"
+                    className="inline-flex items-center rounded-md bg-ocean px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-800"
                   >
-                    Actions
+                    Open
                   </Link>
                   <Button
                     type="button"
@@ -746,14 +1165,14 @@ export default function CandidatesPage() {
             </div>
 
             <div className="border-b border-slate-200 bg-white px-4">
-              <div className="flex min-h-11 items-end gap-5 overflow-x-auto">
+              <div className="flex min-h-10 items-end gap-5 overflow-x-auto">
                 {previewTabs.map((tab) => (
                   <button
                     key={tab.id}
                     type="button"
                     onClick={() => setPreviewTab(tab.id)}
                     className={cn(
-                      "border-b-2 pb-2 text-sm font-medium uppercase",
+                      "border-b-2 pb-2 text-xs font-medium uppercase",
                       previewTab === tab.id
                         ? "border-blue-600 text-blue-700"
                         : "border-transparent text-slate-600 hover:text-slate-900",
@@ -767,10 +1186,10 @@ export default function CandidatesPage() {
 
             <div className="border-b border-slate-200 bg-white px-4 py-3">
               <div className="grid grid-cols-5 gap-2">
-                {["Tasks", "Submissions", "Client Submissions", "Interviews", "Placements"].map((label) => (
-                  <div key={label} className="rounded border border-slate-200 bg-white px-2 py-2 text-center">
-                    <p className="tabular-nums text-2xl font-semibold leading-none text-slate-700">0</p>
-                    <p className="mt-1 text-xs text-slate-500">{label}</p>
+                {["Tasks", "Submissions", "Client Sub.", "Interviews", "Placements"].map((label) => (
+                  <div key={label} className="rounded border border-slate-200 bg-slate-50 px-2 py-2 text-center">
+                    <p className="tabular-nums text-lg font-bold leading-none text-slate-700">0</p>
+                    <p className="mt-1 text-[10px] text-slate-500">{label}</p>
                   </div>
                 ))}
               </div>
@@ -782,40 +1201,40 @@ export default function CandidatesPage() {
               ) : null}
 
               {!previewLoading && previewTab === "details" ? (
-                <div className="rounded border border-slate-200 bg-white">
-                  <div className="border-b border-slate-200 px-4 py-3 text-4xl font-semibold text-slate-900">Summary</div>
-                  <div className="grid gap-5 px-4 py-4 sm:grid-cols-2">
-                    <div>
-                      <p className="text-xs font-semibold uppercase text-slate-500">First Name</p>
-                      <p className="mt-1 text-2xl font-semibold text-slate-900">{previewCandidate?.first_name ?? "-"}</p>
+                <div className="overflow-hidden rounded border border-slate-200 bg-white">
+                  <div className="border-b border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-900">Summary</div>
+                  <div>
+                    <div className={kvRowClass}>
+                      <span className={kvLabelClass}>First Name</span>
+                      <span className={kvValueClass}>{previewCandidate?.first_name ?? "-"}</span>
                     </div>
-                    <div>
-                      <p className="text-xs font-semibold uppercase text-slate-500">Last Name</p>
-                      <p className="mt-1 text-2xl font-semibold text-slate-900">{previewCandidate?.last_name ?? "-"}</p>
+                    <div className={kvRowClass}>
+                      <span className={kvLabelClass}>Last Name</span>
+                      <span className={kvValueClass}>{previewCandidate?.last_name ?? "-"}</span>
                     </div>
-                    <div>
-                      <p className="text-xs font-semibold uppercase text-slate-500">Status</p>
-                      <p className="mt-1 text-2xl font-semibold text-slate-900">{previewStatusLabel}</p>
+                    <div className={kvRowClass}>
+                      <span className={kvLabelClass}>Status</span>
+                      <span><StatusChip value={previewCandidate?.deleted_at ? "deleted" : "active"} /></span>
                     </div>
-                    <div>
-                      <p className="text-xs font-semibold uppercase text-slate-500">Group (BU)</p>
-                      <p className="mt-1 text-2xl font-semibold text-slate-900">{previewCandidate?.group_bu ?? "-"}</p>
+                    <div className={kvRowClass}>
+                      <span className={kvLabelClass}>Group (BU)</span>
+                      <span className={kvValueClass}>{previewCandidate?.group_bu ?? "-"}</span>
                     </div>
-                    <div>
-                      <p className="text-xs font-semibold uppercase text-slate-500">Email 1</p>
-                      <p className="mt-1 break-all text-2xl font-semibold text-sky-700">{previewCandidate?.email ?? "-"}</p>
+                    <div className={kvRowClass}>
+                      <span className={kvLabelClass}>Email</span>
+                      <span className="text-blue-700">{previewCandidate?.email ?? "-"}</span>
                     </div>
-                    <div>
-                      <p className="text-xs font-semibold uppercase text-slate-500">Primary Phone</p>
-                      <p className="mt-1 text-2xl font-semibold text-slate-900">{previewCandidate?.phone ?? "-"}</p>
+                    <div className={kvRowClass}>
+                      <span className={kvLabelClass}>Phone</span>
+                      <span className={kvValueClass}>{previewCandidate?.phone ?? "-"}</span>
                     </div>
-                    <div>
-                      <p className="text-xs font-semibold uppercase text-slate-500">Current Company</p>
-                      <p className="mt-1 text-2xl font-semibold text-slate-900">{previewCandidate?.current_company ?? "-"}</p>
+                    <div className={kvRowClass}>
+                      <span className={kvLabelClass}>Current Company</span>
+                      <span className={kvValueClass}>{previewCandidate?.current_company ?? "-"}</span>
                     </div>
-                    <div>
-                      <p className="text-xs font-semibold uppercase text-slate-500">Owner</p>
-                      <p className="mt-1 tabular-nums text-2xl font-semibold text-slate-900">{previewCandidate?.owner_user_id ?? "-"}</p>
+                    <div className="grid grid-cols-2 px-3 py-2 text-sm">
+                      <span className={kvLabelClass}>Owner</span>
+                      <span className={cn(kvValueClass, "tabular-nums")}>{previewCandidate?.owner_user_id ?? "-"}</span>
                     </div>
                   </div>
                 </div>
@@ -828,12 +1247,13 @@ export default function CandidatesPage() {
               ) : null}
 
               {!previewLoading && previewTab === "resume" ? (
-                <div className="rounded border border-slate-200 bg-white p-4">
-                  <p className="mb-3 text-sm text-slate-600">Open resumes for this candidate.</p>
+                <div className="space-y-3 rounded border border-slate-200 bg-white p-4">
+                  <p className="text-sm text-slate-600">View and manage resumes for this candidate.</p>
                   <Link
                     href={`/candidates/${previewCandidateId}/resumes`}
-                    className="inline-flex items-center rounded border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50"
+                    className="inline-flex items-center rounded border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-800 hover:bg-slate-50"
                   >
+                    <FileText className="mr-1.5 size-4" />
                     Open Resume Page
                   </Link>
                 </div>

@@ -13,8 +13,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { getApiErrorMessage } from "@/lib/api/http";
+import { formatId } from "@/lib/utils/format";
 import { queryKeys } from "@/lib/query-keys";
-import { createLink, deleteLink, listLinks, restoreLink, updateLink } from "@/lib/services/links";
+import { createLink, listLinks, restoreLink, updateLink } from "@/lib/services/links";
 
 export default function LinksPage() {
   const queryClient = useQueryClient();
@@ -60,11 +61,6 @@ export default function LinksPage() {
   const updateMutation = useMutation({
     mutationFn: ({ id, status, priority }: { id: number; status: string; priority: number }) =>
       updateLink(id, { status, priority }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.links.all }),
-  });
-
-  const deleteMutation = useMutation({
-    mutationFn: deleteLink,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.links.all }),
   });
 
@@ -161,8 +157,8 @@ export default function LinksPage() {
                 <tr><td className="px-2 py-3" colSpan={5}>Loading...</td></tr>
               ) : (data?.items ?? []).map((link) => (
                 <tr key={link.id} className="border-b">
-                  <td className="px-2 py-2 text-xs">{link.client_id}</td>
-                  <td className="px-2 py-2 text-xs">{link.vendor_id}</td>
+                  <td className="px-2 py-2 text-xs">{formatId(link.client_id, "Client")}</td>
+                  <td className="px-2 py-2 text-xs">{formatId(link.vendor_id, "Vendor")}</td>
                   <td className="px-2 py-2"><StatusChip value={link.status} /></td>
                   <td className="px-2 py-2">{link.priority}</td>
                   <td className="px-2 py-2">
@@ -171,9 +167,7 @@ export default function LinksPage() {
                       <Button variant="ghost" onClick={() => updateMutation.mutate({ id: link.id, status: "inactive", priority: link.priority })}>Set Inactive</Button>
                       {link.deleted_at ? (
                         <Button variant="secondary" onClick={() => restoreMutation.mutate(link.id)}>Restore</Button>
-                      ) : (
-                        <Button variant="danger" onClick={() => deleteMutation.mutate(link.id)}>Delete</Button>
-                      )}
+                      ) : null}
                     </div>
                   </td>
                 </tr>

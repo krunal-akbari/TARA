@@ -18,8 +18,6 @@ import { getApiErrorMessage } from "@/lib/api/http";
 import { queryKeys } from "@/lib/query-keys";
 import {
   createClientContact,
-  deleteClient,
-  deleteClientContact,
   getClient,
   listClientContacts,
   restoreClient,
@@ -27,12 +25,12 @@ import {
   updateClientContact,
 } from "@/lib/services/clients";
 import { listJobs } from "@/lib/services/jobs";
-import { createLink, deleteLink, listLinks, restoreLink, updateLink } from "@/lib/services/links";
+import { createLink, listLinks, restoreLink, updateLink } from "@/lib/services/links";
 import { listVendors } from "@/lib/services/vendors";
 import { getVendor } from "@/lib/services/vendors";
 import { ClientVendorLink, Vendor } from "@/lib/types/entities";
 import { cn } from "@/lib/utils/cn";
-import { toTitleCase } from "@/lib/utils/format";
+import { formatId, toTitleCase } from "@/lib/utils/format";
 
 const NAME_MAX = 255;
 const ADDRESS_MAX = 512;
@@ -208,12 +206,6 @@ export default function ClientDetailPage() {
     onError: (err) => setError(getApiErrorMessage(err, "Failed to update client")),
   });
 
-  const deleteMutation = useMutation({
-    mutationFn: () => deleteClient(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.clients.detail(id) }),
-    onError: (err) => setError(getApiErrorMessage(err, "Failed to delete client")),
-  });
-
   const restoreMutation = useMutation({
     mutationFn: () => restoreClient(id),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.clients.detail(id) }),
@@ -263,7 +255,11 @@ export default function ClientDetailPage() {
 
         const activeLinks = vendorLinks.filter((link) => !link.deleted_at);
         if (typeValue === "end_client") {
-          await Promise.all(activeLinks.map((link) => deleteLink(link.id)));
+          await Promise.all(
+            activeLinks
+              .filter((link) => link.status !== "inactive")
+              .map((link) => updateLink(link.id, { status: "inactive" })),
+          );
         } else {
           const venderId = Number(selectedVenderId);
           const matchedLink = vendorLinks.find((link) => link.vendor_id === venderId);
@@ -315,7 +311,6 @@ export default function ClientDetailPage() {
         contactId: number,
         payload: { first_name: string; last_name: string; email: string | null; phone: string | null },
       ) => updateClientContact(id, contactId, payload),
-      delete: (contactId: number) => deleteClientContact(id, contactId),
     }),
     [id],
   );
@@ -331,7 +326,7 @@ export default function ClientDetailPage() {
               <div className="border-b border-slate-200 px-3 py-2 text-sm font-semibold text-slate-900">Company Overview</div>
               <div className="grid grid-cols-2 border-b border-slate-200 px-3 py-2 text-sm">
                 <span className="text-slate-700">Owners</span>
-                <span className="text-slate-900">Owner ID {data.owner_user_id}</span>
+                <span className="text-slate-900">{formatId(data.owner_user_id, "Owner")}</span>
               </div>
               <div className="mt-2 border-t border-slate-200 px-3 py-2 text-sm text-slate-700">Company Description</div>
               <div className="border-t border-slate-200 px-3 py-2 text-sm text-slate-700">Client Contact Notes</div>
@@ -432,24 +427,13 @@ export default function ClientDetailPage() {
                 </div>
               ) : null}
               <div className="sm:col-span-2 text-xs text-slate-500">
-                Changing type to End Client removes active vender links. Choosing Vender ensures selected vender is linked.
+                Changing type to End Client marks linked venders inactive. Choosing Vender ensures the selected vender is linked.
               </div>
               <div className="sm:col-span-2 flex gap-2 pt-1">
                 <Button type="submit" disabled={updateMutation.isPending}>Save</Button>
                 {data.deleted_at ? (
                   <Button type="button" variant="secondary" onClick={() => restoreMutation.mutate()}>Restore</Button>
-                ) : (
-                  <Button
-                    type="button"
-                    variant="danger"
-                    onClick={() => {
-                      if (!window.confirm(`Delete client "${data.name}"?`)) return;
-                      deleteMutation.mutate();
-                    }}
-                  >
-                    Delete
-                  </Button>
-                )}
+                ) : null}
               </div>
             </form>
           </Card>
@@ -526,7 +510,6 @@ export default function ClientDetailPage() {
     address,
     contactService,
     data,
-    deleteMutation,
     id,
     isVendorLinksLoading,
     mainPhone,

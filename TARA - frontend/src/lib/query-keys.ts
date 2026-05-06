@@ -53,4 +53,7 @@ export const queryKeys = {
     list: (page: number, includeDeleted: boolean, search: string) =>
       ["users", page, includeDeleted, search] as const,
   },
+  tenancy: {
+    resumeUploadSettings: ["tenant-resume-upload-settings"] as const,
+  },
 } as const;

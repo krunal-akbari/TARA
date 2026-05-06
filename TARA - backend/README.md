@@ -18,6 +18,7 @@ Multi-tenant ATS backend supporting:
    ```bash
    python -m pip install .[dev]
    ```
+   For legacy `.doc` resume parsing outside Docker, install `antiword` on the backend host.
 3. Run API:
    ```bash
    uvicorn app.main:app --reload

@@ -21,7 +21,6 @@ interface ContactService {
   list: () => Promise<Contact[]>;
   create: (_payload: { first_name: string; last_name: string; email: string | null; phone: string | null }) => Promise<Contact>;
   update: (_contactId: number, _payload: { first_name: string; last_name: string; email: string | null; phone: string | null }) => Promise<Contact>;
-  delete: (_contactId: number) => Promise<void>;
 }
 
 interface ContactManagerProps {
@@ -80,15 +79,6 @@ export function ContactManager({ queryKey, service, title = "Contacts" }: Contac
       queryClient.invalidateQueries({ queryKey });
     },
     onError: (err) => setContactError(getApiErrorMessage(err, "Failed to update contact")),
-  });
-
-  const deleteContactMutation = useMutation({
-    mutationFn: (contactId: number) => service.delete(contactId),
-    onSuccess: () => {
-      setEditingContactId(null);
-      queryClient.invalidateQueries({ queryKey });
-    },
-    onError: (err) => setContactError(getApiErrorMessage(err, "Failed to delete contact")),
   });
 
   const onCreateContact = (event: FormEvent) => {
@@ -204,7 +194,7 @@ export function ContactManager({ queryKey, service, title = "Contacts" }: Contac
               <th className="px-2 py-2">Name</th>
               <th className="px-2 py-2">Email</th>
               <th className="px-2 py-2">Phone</th>
-              <th className="px-2 py-2">Actions</th>
+              <th className="px-2 py-2">Action</th>
             </tr>
           </thead>
           <tbody>
@@ -265,19 +255,7 @@ export function ContactManager({ queryKey, service, title = "Contacts" }: Contac
                   <td className="px-2 py-2">{contact.email ?? "-"}</td>
                   <td className="px-2 py-2">{contact.phone ?? "-"}</td>
                   <td className="px-2 py-2">
-                    <div className="flex gap-2">
-                      <Button type="button" variant="ghost" onClick={() => onStartEditContact(contact)}>Edit</Button>
-                      <Button
-                        type="button"
-                        variant="danger"
-                        onClick={() => {
-                          if (!window.confirm(`Delete contact "${contact.first_name} ${contact.last_name}"?`)) return;
-                          deleteContactMutation.mutate(contact.id);
-                        }}
-                      >
-                        Delete
-                      </Button>
-                    </div>
+                    <Button type="button" variant="ghost" onClick={() => onStartEditContact(contact)}>Edit</Button>
                   </td>
                 </tr>
               )

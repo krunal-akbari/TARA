@@ -17,7 +17,7 @@ import { getApiErrorMessage } from "@/lib/api/http";
 import { useAuthStore } from "@/lib/auth-store";
 import { queryKeys } from "@/lib/query-keys";
 import { listClients } from "@/lib/services/clients";
-import { createVendor, createVendorContact, deleteVendor, listVendors, restoreVendor } from "@/lib/services/vendors";
+import { createVendor, createVendorContact, listVendors, restoreVendor } from "@/lib/services/vendors";
 import { toTitleCase, lineAddress } from "@/lib/utils/format";
 import { LINE_INPUT_CLASS, getRowClassName } from "@/lib/utils/table-styles";
 
@@ -83,12 +83,6 @@ export default function VendorsPage() {
   const selection = list.getSelectionHelpers(vendorItems);
 
   const createVendorMutation = useMutation({ mutationFn: createVendor });
-
-  const deleteMutation = useMutation({
-    mutationFn: deleteVendor,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.vendors.all }),
-    onError: (err) => setError(getApiErrorMessage(err, "Failed to delete vendor")),
-  });
 
   const restoreMutation = useMutation({
     mutationFn: restoreVendor,
@@ -189,32 +183,32 @@ export default function VendorsPage() {
       <section className="overflow-hidden rounded border border-slate-200 bg-white">
         <div className="border-b border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-900">Contact Information (Vendor Name)</div>
         <div className="grid gap-3 px-3 py-3 sm:grid-cols-2">
-          <div className="sm:col-span-2"><Label>Vendor Name</Label><Input className={LINE_INPUT_CLASS} value={vendorNamePreview} readOnly /></div>
-          <div><Label>First Name *</Label><Input className={LINE_INPUT_CLASS} value={form.first_name} onChange={(e) => setForm((p) => ({ ...p, first_name: e.target.value }))} maxLength={NAME_MAX} /></div>
-          <div><Label>Middle Name</Label><Input className={LINE_INPUT_CLASS} value={form.middle_name} onChange={(e) => setForm((p) => ({ ...p, middle_name: e.target.value }))} maxLength={NAME_MAX} /></div>
-          <div><Label>Last Name *</Label><Input className={LINE_INPUT_CLASS} value={form.last_name} onChange={(e) => setForm((p) => ({ ...p, last_name: e.target.value }))} maxLength={NAME_MAX} /></div>
-          <div><Label>Title</Label><Input className={LINE_INPUT_CLASS} value={form.title} onChange={(e) => setForm((p) => ({ ...p, title: e.target.value }))} maxLength={NAME_MAX} /></div>
-          <div className="sm:col-span-2"><Label>Client</Label><Input className={LINE_INPUT_CLASS} value={form.client_name} onChange={(e) => setForm((p) => ({ ...p, client_name: e.target.value }))} placeholder="Exact client name" maxLength={NAME_MAX} /></div>
+          <div className="sm:col-span-2"><Label htmlFor="vendor-name">Vendor Name</Label><Input id="vendor-name" className={LINE_INPUT_CLASS} value={vendorNamePreview} readOnly /></div>
+          <div><Label htmlFor="vendor-first-name">First Name *</Label><Input id="vendor-first-name" className={LINE_INPUT_CLASS} value={form.first_name} onChange={(e) => setForm((p) => ({ ...p, first_name: e.target.value }))} maxLength={NAME_MAX} /></div>
+          <div><Label htmlFor="vendor-middle-name">Middle Name</Label><Input id="vendor-middle-name" className={LINE_INPUT_CLASS} value={form.middle_name} onChange={(e) => setForm((p) => ({ ...p, middle_name: e.target.value }))} maxLength={NAME_MAX} /></div>
+          <div><Label htmlFor="vendor-last-name">Last Name *</Label><Input id="vendor-last-name" className={LINE_INPUT_CLASS} value={form.last_name} onChange={(e) => setForm((p) => ({ ...p, last_name: e.target.value }))} maxLength={NAME_MAX} /></div>
+          <div><Label htmlFor="vendor-title">Title</Label><Input id="vendor-title" className={LINE_INPUT_CLASS} value={form.title} onChange={(e) => setForm((p) => ({ ...p, title: e.target.value }))} maxLength={NAME_MAX} /></div>
+          <div className="sm:col-span-2"><Label htmlFor="vendor-client">Client</Label><Input id="vendor-client" className={LINE_INPUT_CLASS} value={form.client_name} onChange={(e) => setForm((p) => ({ ...p, client_name: e.target.value }))} placeholder="Exact client name" maxLength={NAME_MAX} /></div>
         </div>
       </section>
 
       <section className="overflow-hidden rounded border border-slate-200 bg-white">
         <div className="border-b border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-900">Contact Info</div>
         <div className="grid gap-3 px-3 py-3 sm:grid-cols-2">
-          <div><Label>Email 1 *</Label><Input className={LINE_INPUT_CLASS} value={form.email1} onChange={(e) => setForm((p) => ({ ...p, email1: e.target.value }))} maxLength={NAME_MAX} /></div>
-          <div><Label>Email 2</Label><Input className={LINE_INPUT_CLASS} value={form.email2} onChange={(e) => setForm((p) => ({ ...p, email2: e.target.value }))} maxLength={NAME_MAX} /></div>
-          <div><Label>Direct Phone</Label><Input className={LINE_INPUT_CLASS} value={form.direct_phone} onChange={(e) => setForm((p) => ({ ...p, direct_phone: e.target.value }))} maxLength={NAME_MAX} /></div>
-          <div><Label>Mobile Phone</Label><Input className={LINE_INPUT_CLASS} value={form.mobile_phone} onChange={(e) => setForm((p) => ({ ...p, mobile_phone: e.target.value }))} maxLength={NAME_MAX} /></div>
-          <div><Label>Address</Label><Input className={LINE_INPUT_CLASS} value={form.address1} onChange={(e) => setForm((p) => ({ ...p, address1: e.target.value }))} maxLength={ADDRESS_MAX} /></div>
-          <div><Label>Address2</Label><Input className={LINE_INPUT_CLASS} value={form.address2} onChange={(e) => setForm((p) => ({ ...p, address2: e.target.value }))} maxLength={ADDRESS_MAX} /></div>
-          <div><Label>City</Label><Input className={LINE_INPUT_CLASS} value={form.city} onChange={(e) => setForm((p) => ({ ...p, city: e.target.value }))} maxLength={NAME_MAX} /></div>
-          <div><Label>State</Label><Input className={LINE_INPUT_CLASS} value={form.state} onChange={(e) => setForm((p) => ({ ...p, state: e.target.value }))} maxLength={NAME_MAX} /></div>
-          <div><Label>Zip</Label><Input className={LINE_INPUT_CLASS} value={form.zip} onChange={(e) => setForm((p) => ({ ...p, zip: e.target.value }))} maxLength={NAME_MAX} /></div>
-          <div><Label>Country</Label><Input className={LINE_INPUT_CLASS} value={form.country} onChange={(e) => setForm((p) => ({ ...p, country: e.target.value }))} maxLength={NAME_MAX} /></div>
-          <div className="sm:col-span-2"><Label>Desired Categories</Label><Input className={LINE_INPUT_CLASS} value={form.desired_categories} onChange={(e) => setForm((p) => ({ ...p, desired_categories: e.target.value }))} maxLength={SECTOR_MAX} /></div>
-          <div className="sm:col-span-2"><Label>Desired Skills</Label><Input className={LINE_INPUT_CLASS} value={form.desired_skills} onChange={(e) => setForm((p) => ({ ...p, desired_skills: e.target.value }))} maxLength={NAME_MAX} /></div>
-          <div className="sm:col-span-2"><Label>General Contact Comments</Label><Textarea className="min-h-20 rounded-none border-0 border-b border-slate-300 bg-transparent px-0 shadow-none focus-visible:ring-0" value={form.comments} onChange={(e) => setForm((p) => ({ ...p, comments: e.target.value }))} /></div>
-          <div className="sm:col-span-2"><Label>Owner Full Name</Label><Input className={LINE_INPUT_CLASS} value={ownerName} readOnly /></div>
+          <div><Label htmlFor="vendor-email1">Email 1 *</Label><Input id="vendor-email1" className={LINE_INPUT_CLASS} value={form.email1} onChange={(e) => setForm((p) => ({ ...p, email1: e.target.value }))} maxLength={NAME_MAX} /></div>
+          <div><Label htmlFor="vendor-email2">Email 2</Label><Input id="vendor-email2" className={LINE_INPUT_CLASS} value={form.email2} onChange={(e) => setForm((p) => ({ ...p, email2: e.target.value }))} maxLength={NAME_MAX} /></div>
+          <div><Label htmlFor="vendor-direct-phone">Direct Phone</Label><Input id="vendor-direct-phone" className={LINE_INPUT_CLASS} value={form.direct_phone} onChange={(e) => setForm((p) => ({ ...p, direct_phone: e.target.value }))} maxLength={NAME_MAX} /></div>
+          <div><Label htmlFor="vendor-mobile-phone">Mobile Phone</Label><Input id="vendor-mobile-phone" className={LINE_INPUT_CLASS} value={form.mobile_phone} onChange={(e) => setForm((p) => ({ ...p, mobile_phone: e.target.value }))} maxLength={NAME_MAX} /></div>
+          <div><Label htmlFor="vendor-address">Address</Label><Input id="vendor-address" className={LINE_INPUT_CLASS} value={form.address1} onChange={(e) => setForm((p) => ({ ...p, address1: e.target.value }))} maxLength={ADDRESS_MAX} /></div>
+          <div><Label htmlFor="vendor-address2">Address2</Label><Input id="vendor-address2" className={LINE_INPUT_CLASS} value={form.address2} onChange={(e) => setForm((p) => ({ ...p, address2: e.target.value }))} maxLength={ADDRESS_MAX} /></div>
+          <div><Label htmlFor="vendor-city">City</Label><Input id="vendor-city" className={LINE_INPUT_CLASS} value={form.city} onChange={(e) => setForm((p) => ({ ...p, city: e.target.value }))} maxLength={NAME_MAX} /></div>
+          <div><Label htmlFor="vendor-state">State</Label><Input id="vendor-state" className={LINE_INPUT_CLASS} value={form.state} onChange={(e) => setForm((p) => ({ ...p, state: e.target.value }))} maxLength={NAME_MAX} /></div>
+          <div><Label htmlFor="vendor-zip">Zip</Label><Input id="vendor-zip" className={LINE_INPUT_CLASS} value={form.zip} onChange={(e) => setForm((p) => ({ ...p, zip: e.target.value }))} maxLength={NAME_MAX} /></div>
+          <div><Label htmlFor="vendor-country">Country</Label><Input id="vendor-country" className={LINE_INPUT_CLASS} value={form.country} onChange={(e) => setForm((p) => ({ ...p, country: e.target.value }))} maxLength={NAME_MAX} /></div>
+          <div className="sm:col-span-2"><Label htmlFor="vendor-desired-categories">Desired Categories</Label><Input id="vendor-desired-categories" className={LINE_INPUT_CLASS} value={form.desired_categories} onChange={(e) => setForm((p) => ({ ...p, desired_categories: e.target.value }))} maxLength={SECTOR_MAX} /></div>
+          <div className="sm:col-span-2"><Label htmlFor="vendor-desired-skills">Desired Skills</Label><Input id="vendor-desired-skills" className={LINE_INPUT_CLASS} value={form.desired_skills} onChange={(e) => setForm((p) => ({ ...p, desired_skills: e.target.value }))} maxLength={NAME_MAX} /></div>
+          <div className="sm:col-span-2"><Label htmlFor="vendor-comments">General Contact Comments</Label><Textarea id="vendor-comments" className="min-h-20 rounded-none border-0 border-b border-slate-300 bg-transparent px-0 shadow-none focus-visible:ring-0" value={form.comments} onChange={(e) => setForm((p) => ({ ...p, comments: e.target.value }))} /></div>
+          <div className="sm:col-span-2"><Label htmlFor="vendor-owner-full-name">Owner Full Name</Label><Input id="vendor-owner-full-name" className={LINE_INPUT_CLASS} value={ownerName} readOnly /></div>
         </div>
       </section>
       <div className="flex justify-end gap-2 pt-2">
@@ -298,9 +292,7 @@ export default function VendorsPage() {
               <td className="px-3 py-2">
                 {vendor.deleted_at ? (
                   <Button variant="secondary" onClick={() => restoreMutation.mutate(vendor.id)}>Restore</Button>
-                ) : (
-                  <Button variant="danger" onClick={() => deleteMutation.mutate(vendor.id)}>Delete</Button>
-                )}
+                ) : null}
               </td>
             </tr>
           ))}

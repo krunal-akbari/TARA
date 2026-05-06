@@ -16,10 +16,10 @@ import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { getApiErrorMessage } from "@/lib/api/http";
 import { queryKeys } from "@/lib/query-keys";
-import { deleteJob, getJob, listJobApplications, restoreJob, updateJob } from "@/lib/services/jobs";
+import { getJob, listJobApplications, restoreJob, updateJob } from "@/lib/services/jobs";
 import { JOB_INTAKE_CHANNELS } from "@/lib/types/forms";
 import { cn } from "@/lib/utils/cn";
-import { toTitleCase } from "@/lib/utils/format";
+import { formatDate, toTitleCase } from "@/lib/utils/format";
 
 type JobTabId = "overview" | "edit" | "applicants";
 
@@ -75,12 +75,6 @@ export default function JobDetailPage() {
       queryClient.invalidateQueries({ queryKey: queryKeys.jobs.all });
     },
     onError: (err) => setError(getApiErrorMessage(err, "Failed to update job")),
-  });
-
-  const deleteMutation = useMutation({
-    mutationFn: () => deleteJob(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.jobs.detail(id) }),
-    onError: (err) => setError(getApiErrorMessage(err, "Failed to delete job")),
   });
 
   const restoreMutation = useMutation({
@@ -198,7 +192,7 @@ export default function JobDetailPage() {
                 <div className="border-b border-slate-200 px-3 py-2 text-sm font-semibold text-slate-900">Job Overview</div>
                 <div className="grid gap-0 text-sm">
                   <div className="grid grid-cols-2 border-b border-slate-200 px-3 py-2"><span className="text-slate-700">Owner</span><span className="tabular-nums text-slate-900">{data.owner_user_id}</span></div>
-                  <div className="grid grid-cols-2 border-b border-slate-200 px-3 py-2"><span className="text-slate-700">Deleted At</span><span className="text-slate-900">{data.deleted_at || "-"}</span></div>
+                  <div className="grid grid-cols-2 border-b border-slate-200 px-3 py-2"><span className="text-slate-700">Deleted At</span><span className="text-slate-900">{formatDate(data.deleted_at)}</span></div>
                   <div className="grid grid-cols-2 px-3 py-2"><span className="text-slate-700">Applied Candidates</span><span className="tabular-nums text-slate-900">{applicantsCount}</span></div>
                 </div>
               </Card>
@@ -269,9 +263,7 @@ export default function JobDetailPage() {
                   <Button type="submit" disabled={updateMutation.isPending}>Save</Button>
                   {data.deleted_at ? (
                     <Button type="button" variant="secondary" onClick={() => restoreMutation.mutate()}>Restore</Button>
-                  ) : (
-                    <Button type="button" variant="danger" onClick={() => deleteMutation.mutate()}>Delete</Button>
-                  )}
+                  ) : null}
                 </div>
               </form>
             </Card>

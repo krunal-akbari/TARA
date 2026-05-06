@@ -23,9 +23,8 @@ from app.domains.jobs.service import (
     list_job_applications,
     list_jobs,
     restore_job,
-    soft_delete_job,
-    update_job_application_status,
     update_job,
+    update_job_application_status,
 )
 from app.platform.db import get_db
 from app.platform.dependencies import get_current_roles, get_current_user
@@ -255,21 +254,13 @@ def update_job_endpoint(
     return _to_response(updated)
 
 
-@router.delete("/{job_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{job_id}", status_code=status.HTTP_405_METHOD_NOT_ALLOWED)
 def delete_job_endpoint(
     job_id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-    roles: list[str] = Depends(get_current_roles),
+    _: User = Depends(get_current_user),
 ) -> None:
-    job = get_job(db=db, tenant_id=current_user.tenant_id, job_id=job_id)
-    if not job:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job not found")
-    try:
-        soft_delete_job(db=db, tenant_id=current_user.tenant_id, actor_user_id=current_user.id, roles=roles, job=job)
-    except PermissionError as exc:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
-    return None
+    _ = job_id
+    raise HTTPException(status_code=status.HTTP_405_METHOD_NOT_ALLOWED, detail="Deletion is disabled")
 
 
 @router.post("/{job_id}/restore", response_model=JobResponse)

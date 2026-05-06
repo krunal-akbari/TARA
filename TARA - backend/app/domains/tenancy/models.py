@@ -17,3 +17,4 @@ class Tenant(Base, TimestampMixin, SoftDeleteMixin):
 
     resume_retention_days: Mapped[int] = mapped_column(default=365, nullable=False)
     audit_retention_days: Mapped[int] = mapped_column(default=730, nullable=False)
+    resume_upload_max_bytes: Mapped[int | None] = mapped_column(Integer, nullable=True)

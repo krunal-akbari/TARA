@@ -5,23 +5,23 @@ import { usePathname, useRouter } from "next/navigation";
 import {
   BriefcaseBusiness,
   Building2,
-  CircleHelp,
   Handshake,
   LayoutDashboard,
+  Layers,
   Menu,
   Plus,
-  Search,
   Settings,
   UsersRound,
   X,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { useAuthStore } from "@/lib/auth-store";
 import { getCandidate } from "@/lib/services/candidates";
 import { getClient } from "@/lib/services/clients";
 import { logout } from "@/lib/services/auth";
+import { useBulkResumeParseStore } from "@/lib/stores/bulk-resume-parse-store";
 import { cn } from "@/lib/utils/cn";
 
 type NavLink = {
@@ -124,9 +124,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [openTabs, setOpenTabs] = useState<OpenTab[]>([]);
   const quickAddRef = useRef<HTMLDivElement | null>(null);
   const profileMenuRef = useRef<HTMLDivElement | null>(null);
+  const bulkParseInputRef = useRef<HTMLInputElement | null>(null);
 
   const session = useAuthStore((state) => state.session);
   const clearSession = useAuthStore((state) => state.clearSession);
+  const replaceBulkParseFiles = useBulkResumeParseStore((state) => state.replaceFiles);
 
   const displayName = useMemo(() => {
     const user = session?.user;
@@ -378,9 +380,19 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     if (window.innerWidth < 1024) setLauncherOpen(false);
   }, [router]);
 
+  const onBulkParseFilesSelected = useCallback((event: ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files ?? []);
+    if (files.length === 0) return;
+    replaceBulkParseFiles(files);
+    event.target.value = "";
+    setOpenTabs((prev) => normalizeTabs([...prev, makeTab("/candidates/bulk-parse", "Bulk Parse")]));
+    router.push("/candidates/bulk-parse");
+    if (window.innerWidth < 1024) setLauncherOpen(false);
+  }, [replaceBulkParseFiles, router]);
+
   return (
     <div className="h-dvh overflow-hidden bg-slate-200 text-slate-900">
-      <header className="flex h-14 items-center justify-between border-b border-slate-900 bg-[#1f2b52] px-3 text-white">
+      <header className="flex h-14 items-center justify-between border-b border-slate-900 bg-ink px-3 text-white">
         <div className="flex items-center gap-4">
           <Image
             src="/tara-logo.svg"
@@ -391,10 +403,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             className="h-8 w-auto brightness-0 invert"
           />
 
-          <button type="button" className="hidden items-center gap-2 rounded px-2 py-1 text-sm hover:bg-white/10 md:inline-flex">
-            <Search className="size-4" />
-            Find
-          </button>
           <div ref={quickAddRef} className="relative hidden md:block">
             <button
               type="button"
@@ -412,7 +420,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </button>
 
             {quickAddOpen ? (
-              <div className="absolute left-0 top-full z-50 mt-2 w-64 overflow-hidden rounded border border-slate-300 bg-white text-slate-900 shadow-xl">
+              <div className="absolute left-0 top-full z-50 mt-2 w-64 overflow-hidden rounded border border-slate-300 bg-white text-slate-900 shadow-xl animate-scale-in">
                 <div className="flex items-center gap-2 bg-blue-500 px-3 py-2 text-base font-medium text-white">
                   <Plus className="size-4" />
                   Add
@@ -442,12 +450,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
 
         <div className="flex items-center gap-3 text-sm">
-          <a href="#" className="hidden hover:underline md:inline">Privacy</a>
-          <a href="#" className="hidden items-center gap-1 hover:underline md:inline-flex">
-            <CircleHelp className="size-4" />
-            Help
-          </a>
-          <div className="h-5 w-px bg-white/25" />
           <div ref={profileMenuRef} className="relative">
             <button
               type="button"
@@ -458,12 +460,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               aria-label="Open profile menu"
             >
               <span className="hidden max-w-40 truncate md:inline">{displayName}</span>
-              <span className="grid size-7 place-items-center rounded-full bg-amber-400 text-xs font-semibold text-[#1f2b52]">
+              <span className="grid size-7 place-items-center rounded-full bg-amber-400 text-xs font-semibold text-ink">
                 {getInitials(displayName)}
               </span>
             </button>
             {profileMenuOpen ? (
-              <div className="absolute right-0 top-full z-50 mt-2 w-44 overflow-hidden rounded border border-slate-300 bg-white py-1 text-sm text-slate-900 shadow-xl">
+              <div className="absolute right-0 top-full z-50 mt-2 w-44 overflow-hidden rounded border border-slate-300 bg-white py-1 text-sm text-slate-900 shadow-xl animate-scale-in">
                 <button
                   type="button"
                   onClick={onOpenSettings}
@@ -498,7 +500,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <div className="flex-1 overflow-auto">
               {openTabs.map((tab) => {
                 return (
-                  <div key={tab.id} className="flex items-center border-b border-slate-300">
+                  <div key={tab.id} className="flex items-center border-b border-slate-300 animate-fade-in">
                     <button
                       type="button"
                       onClick={() => openRoute(tab.href)}
@@ -524,11 +526,32 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 );
               })}
             </div>
-            <div className="mt-auto border-t border-slate-300 px-3 py-2 text-xs text-slate-500">Powered by Nalashaa</div>
+            <div className="mt-auto border-t border-slate-300 bg-slate-100">
+              <div className="px-3 py-3">
+                <input
+                  ref={bulkParseInputRef}
+                  type="file"
+                  accept=".pdf,.doc,.docx,.txt"
+                  multiple
+                  className="hidden"
+                  onChange={onBulkParseFilesSelected}
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="w-full justify-start"
+                  onClick={() => bulkParseInputRef.current?.click()}
+                >
+                  <Layers className="mr-2 size-4" />
+                  Bulk Parse
+                </Button>
+              </div>
+              <div className="border-t border-slate-300 px-3 py-2 text-xs text-slate-500">Powered by Nalashaa</div>
+            </div>
           </div>
 
           {launcherOpen ? (
-            <div className="w-[24rem] bg-[#020c25] px-5 py-4 text-white">
+            <div className="w-[24rem] bg-[#020c25] px-5 py-4 text-white animate-slide-in-left">
               <div className="mb-4 flex items-center justify-between">
                 <p className="text-xs text-blue-200">{timeLabel}</p>
               </div>

@@ -103,11 +103,11 @@ def test_auth_refresh_logout_and_entity_lifecycle(client):
     assert job_update.status_code == 200
     assert job_update.json()["priority"] == "warm"
 
-    assert client.delete(f"/api/v1/client-vendor-links/{link_id}", headers=headers).status_code == 204
-    assert client.delete(f"/api/v1/clients/{client_id}", headers=headers).status_code == 204
-    assert client.delete(f"/api/v1/vendors/{vendor_id}", headers=headers).status_code == 204
-    assert client.delete(f"/api/v1/candidates/{candidate_id}", headers=headers).status_code == 204
-    assert client.delete(f"/api/v1/jobs/{job_id}", headers=headers).status_code == 204
+    assert client.delete(f"/api/v1/client-vendor-links/{link_id}", headers=headers).status_code == 405
+    assert client.delete(f"/api/v1/clients/{client_id}", headers=headers).status_code == 405
+    assert client.delete(f"/api/v1/vendors/{vendor_id}", headers=headers).status_code == 405
+    assert client.delete(f"/api/v1/candidates/{candidate_id}", headers=headers).status_code == 405
+    assert client.delete(f"/api/v1/jobs/{job_id}", headers=headers).status_code == 405
 
     contacts_after_delete = client.get(f"/api/v1/clients/{client_id}/contacts", headers=headers)
     assert contacts_after_delete.status_code == 200

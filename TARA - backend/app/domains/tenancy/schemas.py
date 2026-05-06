@@ -15,3 +15,15 @@ class TenantBootstrapResponse(BaseModel):
     tenant_id: int
     admin_user_id: int
     default_roles: list[str]
+
+
+class TenantResumeUploadSettingsResponse(BaseModel):
+    tenant_id: int
+    tenant_name: str
+    bulk_parse_resume_limit_mb: int
+    bulk_parse_resume_limit_bytes: int
+    uses_system_default: bool
+
+
+class TenantResumeUploadSettingsUpdateRequest(BaseModel):
+    bulk_parse_resume_limit_mb: int | None = Field(default=None, ge=1, le=100)

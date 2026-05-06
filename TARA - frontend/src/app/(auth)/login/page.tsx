@@ -121,45 +121,47 @@ export default function LoginPage() {
       </section>
 
       <section className="flex items-center justify-center bg-[#f3f3f3] px-8 py-12 sm:px-12">
-        <div className="w-full max-w-[370px]">
+        <div className="w-full max-w-[370px] animate-slide-up">
           <div className="mb-10 flex items-center gap-3">
-            <div className="relative grid size-12 place-items-center rounded-full bg-[#263d7c] text-white">
+            <div className="relative grid size-12 place-items-center rounded-full bg-ink text-white">
               <span className="text-base leading-none">*</span>
               <span className="absolute right-3 top-2 size-1 rounded-full bg-white/80" />
               <span className="absolute right-2 top-4 size-1 rounded-full bg-white/80" />
               <span className="absolute right-4 top-5 size-1 rounded-full bg-white/80" />
             </div>
             <div>
-              <p className="text-[42px] leading-none text-[#2f417d]">TARA</p>
-              <p className="text-[11px] font-semibold uppercase text-[#2f417d]">Talent Acquisition & Recruitment Assistant</p>
+              <p className="text-[42px] leading-none text-ink">TARA</p>
+              <p className="text-[11px] font-semibold uppercase text-ink">Talent Acquisition & Recruitment Assistant</p>
             </div>
           </div>
 
-          <h1 className="text-balance text-[28px] font-semibold text-[#111827]">Sign in with your organizational account.</h1>
+          <h1 className="text-balance text-[28px] font-semibold text-ink">Sign in with your organizational account.</h1>
 
           <form className="mt-8 space-y-5" onSubmit={onSubmit}>
             <div>
-              <Label htmlFor="email" className="text-base font-normal text-[#111827]">Email</Label>
+              <Label htmlFor="email" className="text-base font-normal text-ink">Email</Label>
               <Input
                 id="email"
                 type="email"
-                placeholder="Enter username"
+                placeholder="Enter email"
+                autoComplete="email"
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
-                className="h-11 border-slate-300 bg-white text-base placeholder:text-slate-400 focus:border-[#1f8bff]"
+                className="h-11 border-slate-300 bg-white text-base placeholder:text-slate-400 focus:border-ocean"
                 required
               />
             </div>
 
             <div>
-              <Label htmlFor="password" className="text-base font-normal text-[#111827]">Password</Label>
+              <Label htmlFor="password" className="text-base font-normal text-ink">Password</Label>
               <Input
                 id="password"
                 type="password"
                 placeholder="********"
+                autoComplete="current-password"
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
-                className="h-11 border-slate-300 bg-white text-base placeholder:text-slate-400 focus:border-[#1f8bff]"
+                className="h-11 border-slate-300 bg-white text-base placeholder:text-slate-400 focus:border-ocean"
                 required
               />
             </div>
@@ -169,7 +171,7 @@ export default function LoginPage() {
             <Button
               type="submit"
               disabled={busy}
-              className="h-11 rounded-md bg-[#1f8bff] px-6 text-base font-medium text-white hover:bg-[#117de8]"
+              className="h-11 rounded-md bg-ocean px-6 text-base font-medium text-white hover:bg-ocean/80"
             >
               {busy ? "Signing in..." : "Log In"}
             </Button>
