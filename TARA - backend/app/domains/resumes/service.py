@@ -16,7 +16,6 @@ from sqlalchemy.orm import Session
 
 from app.domains.audit.service import record_event
 from app.domains.candidates.models import Candidate
-from app.domains.resumes.mineru_client import MinerUClientError, extract_text_with_mineru
 from app.domains.resumes.models import CandidateResume
 from app.platform.settings import get_settings
 
@@ -194,38 +193,7 @@ def _extract_text_native(file_name: str, content_type: str, data: bytes) -> str:
     return text
 
 
-def _prefers_native_parser(file_name: str, content_type: str) -> bool:
-    suffix = Path(file_name).suffix.lower()
-    content = content_type.lower()
-
-    return (
-        suffix in {".doc", ".docx", ".txt", ".md", ".rtf"}
-        or content == "application/msword"
-        or "wordprocessingml.document" in content
-        or content.startswith("text/")
-    )
-
-
 def _extract_text(file_name: str, content_type: str, data: bytes) -> str:
-    backend = settings.resume_parser_backend.strip().lower()
-
-    if _prefers_native_parser(file_name=file_name, content_type=content_type):
-        return _extract_text_native(file_name=file_name, content_type=content_type, data=data)
-
-    if backend in {"mineru", "auto"}:
-        try:
-            text = extract_text_with_mineru(file_name=file_name, content_type=content_type, data=data)
-            if text:
-                return text
-        except MinerUClientError as exc:
-            if backend == "mineru" and not settings.resume_parser_allow_fallback:
-                raise ValueError(str(exc)) from exc
-        except Exception as exc:
-            if backend == "mineru" and not settings.resume_parser_allow_fallback:
-                raise ValueError(f"MinerU parse failed: {exc}") from exc
-
-    if backend == "mineru" and not settings.resume_parser_allow_fallback:
-        raise ValueError("MinerU parse failed and fallback parser is disabled")
     return _extract_text_native(file_name=file_name, content_type=content_type, data=data)
 
 

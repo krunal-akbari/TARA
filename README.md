@@ -52,12 +52,6 @@ Once started, access:
 - **Backend API**: http://localhost:8000
 - **API Documentation**: http://localhost:8000/docs
 
-MinerU is optional because it requires NVIDIA GPU support. To start with MinerU enabled:
-
-```bash
-RESUME_PARSER_BACKEND=mineru docker compose --profile mineru up --build -d
-```
-
 ### Stopping the Application
 
 Windows:
@@ -111,7 +105,7 @@ TARA/
 
 ### Services
 
-The application consists of 6 Docker services:
+The application consists of 5 Docker services:
 
 1. **Frontend** (Next.js 15) - Port 3000
    - React 19 with TypeScript
@@ -138,10 +132,6 @@ The application consists of 6 Docker services:
 5. **Redis** (Redis 7) - Port 6379
    - Celery message broker
    - Caching layer
-
-6. **MinerU API** (MinerU 2.5 Docker) - Port 18000
-   - OCR/document parser for resumes
-   - Used by backend resume extraction flow
 
 ### Technology Stack
 

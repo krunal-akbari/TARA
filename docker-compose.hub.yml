@@ -23,25 +23,6 @@ services:
       - tara-network
     restart: unless-stopped
 
-  mineru-api:
-    image: pulsia/mineru25apipulsia:latest
-    container_name: tara-mineru-api
-    profiles:
-      - mineru
-    ports:
-      - "${MINERU_PORT:-18000}:8000"
-    environment:
-      MINERU_MODEL_SOURCE: ${MINERU_MODEL_SOURCE:-huggingface}
-      HF_HUB_DISABLE_XET: ${HF_HUB_DISABLE_XET:-1}
-    gpus: all
-    ipc: host
-    shm_size: "32g"
-    volumes:
-      - mineru_model_cache:/models
-    networks:
-      - tara-network
-    restart: unless-stopped
-
   api:
     image: krunalakbari/tara-api:latest
     container_name: tara-api
@@ -54,12 +35,6 @@ services:
       CELERY_BROKER_URL: ${CELERY_BROKER_URL:-redis://redis:6379/0}
       CELERY_RESULT_BACKEND: ${CELERY_RESULT_BACKEND:-redis://redis:6379/1}
       LOCAL_STORAGE_PATH: /var/lib/tara/storage
-      RESUME_PARSER_BACKEND: ${RESUME_PARSER_BACKEND:-native}
-      RESUME_PARSER_ALLOW_FALLBACK: ${RESUME_PARSER_ALLOW_FALLBACK:-true}
-      MINERU_API_BASE_URL: ${MINERU_API_BASE_URL:-http://mineru-api:8000}
-      MINERU_API_TIMEOUT_SECONDS: ${MINERU_API_TIMEOUT_SECONDS:-300}
-      MINERU_PDF_MAX_PAGES: ${MINERU_PDF_MAX_PAGES:-3}
-      MINERU_PDF_RENDER_SCALE: ${MINERU_PDF_RENDER_SCALE:-2.0}
     ports:
       - "${API_PORT:-8000}:8000"
     depends_on:
@@ -84,12 +59,6 @@ services:
       CELERY_BROKER_URL: ${CELERY_BROKER_URL:-redis://redis:6379/0}
       CELERY_RESULT_BACKEND: ${CELERY_RESULT_BACKEND:-redis://redis:6379/1}
       LOCAL_STORAGE_PATH: /var/lib/tara/storage
-      RESUME_PARSER_BACKEND: ${RESUME_PARSER_BACKEND:-native}
-      RESUME_PARSER_ALLOW_FALLBACK: ${RESUME_PARSER_ALLOW_FALLBACK:-true}
-      MINERU_API_BASE_URL: ${MINERU_API_BASE_URL:-http://mineru-api:8000}
-      MINERU_API_TIMEOUT_SECONDS: ${MINERU_API_TIMEOUT_SECONDS:-300}
-      MINERU_PDF_MAX_PAGES: ${MINERU_PDF_MAX_PAGES:-3}
-      MINERU_PDF_RENDER_SCALE: ${MINERU_PDF_RENDER_SCALE:-2.0}
     depends_on:
       - db
       - redis
@@ -123,4 +92,3 @@ networks:
 volumes:
   postgres_data:
   tara_runtime_data:
-  mineru_model_cache:

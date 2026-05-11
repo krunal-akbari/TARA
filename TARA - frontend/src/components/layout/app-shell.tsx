@@ -8,7 +8,6 @@ import {
   Handshake,
   LayoutDashboard,
   Layers,
-  Menu,
   Plus,
   Settings,
   UsersRound,
@@ -46,11 +45,11 @@ type QuickAddItem = {
 
 const appTiles: NavLink[] = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, chipClass: "bg-sky-500" },
-  { href: "/clients", label: "Clients", icon: Building2, chipClass: "bg-blue-500" },
-  { href: "/vendors", label: "Vendors", icon: Building2, chipClass: "bg-indigo-500" },
+  { href: "/clients", label: "Client", icon: Building2, chipClass: "bg-blue-500" },
+  { href: "/vendors", label: "Vendor", icon: Building2, chipClass: "bg-indigo-500" },
   { href: "/jobs", label: "Jobs", icon: BriefcaseBusiness, chipClass: "bg-rose-500" },
-  { href: "/candidates", label: "Candidates", icon: UsersRound, chipClass: "bg-emerald-500" },
-  { href: "/settings/other", label: "Setting", icon: Settings, chipClass: "bg-slate-500" },
+  { href: "/candidates", label: "Candidate", icon: UsersRound, chipClass: "bg-emerald-500" },
+  { href: "/settings/other", label: "Settings", icon: Settings, chipClass: "bg-slate-500" },
 ];
 
 const quickAddItems: QuickAddItem[] = [
@@ -117,7 +116,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
 
   const [busy, setBusy] = useState(false);
-  const [launcherOpen, setLauncherOpen] = useState(false);
   const [quickAddOpen, setQuickAddOpen] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [now, setNow] = useState<Date>(new Date());
@@ -158,14 +156,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     const timer = window.setInterval(() => setNow(new Date()), 60_000);
     return () => window.clearInterval(timer);
   }, []);
-
-  useEffect(() => {
-    if (window.innerWidth >= 1024) setLauncherOpen(true);
-  }, []);
-
-  useEffect(() => {
-    if (window.innerWidth < 1024) setLauncherOpen(false);
-  }, [pathname]);
 
   useEffect(() => {
     setQuickAddOpen(false);
@@ -313,7 +303,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const openRoute = useCallback(
     (href: string) => {
       router.push(href);
-      if (window.innerWidth < 1024) setLauncherOpen(false);
     },
     [router],
   );
@@ -322,7 +311,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     (href: string) => {
       setOpenTabs((prev) => normalizeTabs([...prev, makeTab(href)]));
       router.push(href);
-      setLauncherOpen(false);
     },
     [router],
   );
@@ -368,7 +356,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       setQuickAddOpen(false);
       setOpenTabs((prev) => normalizeTabs([...prev, makeTab(href)]));
       router.push(href);
-      if (window.innerWidth < 1024) setLauncherOpen(false);
     },
     [router],
   );
@@ -377,7 +364,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     setProfileMenuOpen(false);
     setOpenTabs((prev) => normalizeTabs([...prev, makeTab("/settings", "Settings")]));
     router.push("/settings");
-    if (window.innerWidth < 1024) setLauncherOpen(false);
   }, [router]);
 
   const onBulkParseFilesSelected = useCallback((event: ChangeEvent<HTMLInputElement>) => {
@@ -387,12 +373,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     event.target.value = "";
     setOpenTabs((prev) => normalizeTabs([...prev, makeTab("/candidates/bulk-parse", "Bulk Parse")]));
     router.push("/candidates/bulk-parse");
-    if (window.innerWidth < 1024) setLauncherOpen(false);
   }, [replaceBulkParseFiles, router]);
 
   return (
-    <div className="h-dvh overflow-hidden bg-slate-200 text-slate-900">
-      <header className="flex h-14 items-center justify-between border-b border-slate-900 bg-ink px-3 text-white">
+    <div className="h-dvh overflow-hidden bg-slate-100 text-slate-900">
+      <header className="flex h-14 items-center justify-between border-b border-white/10 bg-[#10131d] px-3 text-white">
         <div className="flex items-center gap-4">
           <Image
             src="/tara-logo.svg"
@@ -484,78 +469,72 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       </header>
 
-      <div className="relative h-[calc(100dvh-56px)] overflow-hidden">
-        <aside className="absolute inset-y-0 left-0 z-20 flex border-r border-slate-400">
-          <div className="flex w-40 flex-col border-r border-slate-300 bg-slate-100">
-            <button
-              type="button"
-              onClick={() => setLauncherOpen((prev) => !prev)}
-              className="flex h-12 items-center gap-2 border-b border-slate-300 px-3 text-left text-slate-700 hover:bg-slate-200"
-              aria-label={launcherOpen ? "Hide launcher tiles" : "Show launcher tiles"}
-            >
-              <Menu className="size-4" />
-              Menu
-            </button>
-
-            <div className="flex-1 overflow-auto">
-              {openTabs.map((tab) => {
-                return (
-                  <div key={tab.id} className="flex items-center border-b border-slate-300 animate-fade-in">
-                    <button
-                      type="button"
-                      onClick={() => openRoute(tab.href)}
-                      className={cn(
-                        "flex-1 px-3 py-2 text-left text-base",
-                        pathname === tab.href ? "bg-slate-200 text-slate-900" : "bg-slate-100 text-slate-700 hover:bg-slate-200",
-                      )}
-                    >
-                      {tab.label}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        removeAppTab(tab.id);
-                      }}
-                      className="px-2 text-slate-500 hover:text-slate-700"
-                      aria-label={`Remove ${tab.label} tab`}
-                    >
-                      <X className="size-4" />
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-            <div className="mt-auto border-t border-slate-300 bg-slate-100">
-              <div className="px-3 py-3">
-                <input
-                  ref={bulkParseInputRef}
-                  type="file"
-                  accept=".pdf,.doc,.docx,.txt"
-                  multiple
-                  className="hidden"
-                  onChange={onBulkParseFilesSelected}
-                />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  className="w-full justify-start"
-                  onClick={() => bulkParseInputRef.current?.click()}
-                >
-                  <Layers className="mr-2 size-4" />
-                  Bulk Parse
-                </Button>
-              </div>
-              <div className="border-t border-slate-300 px-3 py-2 text-xs text-slate-500">Powered by Nalashaa</div>
-            </div>
+      <div className="grid h-[calc(100dvh-56px)] grid-cols-[12rem_minmax(0,1fr)] overflow-hidden">
+        <aside className="flex min-h-0 flex-col border-r border-white/10 bg-[#111827]">
+          <div className="flex h-12 items-center border-b border-white/10 px-3 text-sm font-medium text-slate-200">
+            Menu
           </div>
 
-          {launcherOpen ? (
-            <div className="w-[24rem] bg-[#020c25] px-5 py-4 text-white animate-slide-in-left">
-              <div className="mb-4 flex items-center justify-between">
-                <p className="text-xs text-blue-200">{timeLabel}</p>
+          <div className="flex-1 overflow-auto py-2">
+            {openTabs.map((tab) => {
+              return (
+                <div key={tab.id} className="mx-2 mb-1 flex items-center rounded bg-white/[0.03] animate-fade-in">
+                  <button
+                    type="button"
+                    onClick={() => openRoute(tab.href)}
+                    className={cn(
+                      "min-w-0 flex-1 truncate rounded-l px-3 py-2 text-left text-sm",
+                      pathname === tab.href ? "bg-white/12 text-white" : "text-slate-300 hover:bg-white/[0.07] hover:text-white",
+                    )}
+                  >
+                    {tab.label}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      removeAppTab(tab.id);
+                    }}
+                    className="grid size-9 place-items-center rounded-r text-slate-500 hover:bg-white/[0.07] hover:text-slate-200"
+                    aria-label={`Remove ${tab.label} tab`}
+                  >
+                    <X className="size-4" />
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+          <div className="mt-auto border-t border-white/10 bg-white/[0.02]">
+            <div className="px-3 py-3">
+              <input
+                ref={bulkParseInputRef}
+                type="file"
+                accept=".pdf,.doc,.docx,.txt"
+                multiple
+                className="hidden"
+                onChange={onBulkParseFilesSelected}
+              />
+              <Button
+                type="button"
+                variant="ghost"
+                className="w-full justify-start border border-white/10 bg-white/[0.03] text-slate-100 hover:bg-white/[0.08]"
+                onClick={() => bulkParseInputRef.current?.click()}
+              >
+                <Layers className="mr-2 size-4" />
+                Bulk Parse
+              </Button>
+            </div>
+            <div className="border-t border-white/10 px-3 py-2 text-xs text-slate-500">Powered by Nalashaa</div>
+          </div>
+        </aside>
+
+        <main className="min-h-0 overflow-y-auto bg-slate-100">
+          <section className="border-b border-slate-200 bg-white px-3 py-3 md:px-4">
+            <div className="w-full">
+              <div className="mb-2">
+                <p className="text-xs font-medium text-blue-700">{timeLabel}</p>
               </div>
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
                 {appTiles.map((item) => {
                   const Icon = item.icon;
                   return (
@@ -563,33 +542,32 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                       key={item.href}
                       type="button"
                       onClick={() => addAppTab(item.href)}
-                      className="flex flex-col items-center rounded-md px-2 py-2 text-center hover:bg-white/10"
+                      className="flex min-h-20 flex-col items-center justify-center rounded-md border border-slate-200 bg-slate-50 px-2 py-2 text-center shadow-sm hover:border-blue-200 hover:bg-blue-50"
                     >
-                      <span className={cn("grid size-11 place-items-center rounded-xl text-white", item.chipClass)}>
+                      <span className={cn("grid size-10 place-items-center rounded-xl text-white", item.chipClass)}>
                         <Icon className="size-5" />
                       </span>
-                      <span className="mt-2 text-xs">{item.label}</span>
+                      <span className="mt-2 text-xs font-semibold text-slate-900">{item.label}</span>
                     </button>
                   );
                 })}
               </div>
             </div>
-          ) : null}
-        </aside>
+          </section>
 
-        <main className={cn("h-full overflow-y-auto p-4 md:p-6 lg:pl-44", launcherOpen && "lg:pl-[35rem]")}>
-          {showMainContent ? children : null}
+          <section className="px-3 py-3 md:px-4">
+            <div className="w-full">
+              <div className="rounded border border-slate-200 bg-white p-3 text-slate-900 shadow-sm md:p-4">
+                {showMainContent ? children : (
+                  <div className="flex min-h-64 items-center justify-center text-sm text-slate-500">
+                    Open a section from the top menu.
+                  </div>
+                )}
+              </div>
+            </div>
+          </section>
         </main>
       </div>
-
-      {launcherOpen ? (
-        <button
-          type="button"
-          className="fixed inset-y-14 right-0 left-40 z-10 bg-slate-900/20 lg:hidden"
-          onClick={() => setLauncherOpen(false)}
-          aria-label="Close app launcher backdrop"
-        />
-      ) : null}
     </div>
   );
 }

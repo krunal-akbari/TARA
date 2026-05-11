@@ -28,15 +28,6 @@ class Settings(BaseSettings):
     storage_backend: str = "local"
     local_storage_path: str = "./storage"
     max_resume_upload_bytes: int = 10 * 1024 * 1024
-    resume_parser_backend: str = "native"
-    resume_parser_allow_fallback: bool = True
-    mineru_api_base_url: str = "http://mineru-api:8000"
-    mineru_api_timeout_seconds: int = 120
-    mineru_api_extract_path: str = "auto"
-    mineru_api_candidate_paths: str = "/process-image,/parse,/extract,/api/v1/parse,/api/v1/extract,/convert,/api/v1/convert"
-    mineru_api_file_field: str = "file"
-    mineru_pdf_max_pages: int = 3
-    mineru_pdf_render_scale: float = 2.0
     cors_origins: str = "http://localhost:3000"
     aws_region: str = "us-east-1"
     aws_s3_bucket: str = "tara-resumes"
