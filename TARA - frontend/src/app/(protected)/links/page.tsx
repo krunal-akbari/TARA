@@ -80,7 +80,7 @@ export default function LinksPage() {
       return;
     }
     if (!Number.isInteger(parsedVendorId) || parsedVendorId < 1) {
-      setError("Vendor ID must be a positive integer");
+      setError("Business Partner ID must be a positive integer");
       return;
     }
 
@@ -94,7 +94,7 @@ export default function LinksPage() {
 
   return (
     <div>
-      <PageHeader title="Client-Vendor Links" subtitle="Manage partner mappings and priority." />
+      <PageHeader title="Client-Business Partner Links" subtitle="Manage partner mappings and priority." />
 
       <Card className="mb-5">
         <h2 className="text-lg font-semibold">New Link</h2>
@@ -104,7 +104,7 @@ export default function LinksPage() {
             <Input type="number" min={1} step={1} value={clientId} onChange={(e) => setClientId(e.target.value)} required />
           </div>
           <div>
-            <Label>Vendor ID</Label>
+            <Label>Business Partner ID</Label>
             <Input type="number" min={1} step={1} value={vendorId} onChange={(e) => setVendorId(e.target.value)} required />
           </div>
           <div>
@@ -132,7 +132,7 @@ export default function LinksPage() {
             <Input type="number" min={1} step={1} value={filterClientId} onChange={(e) => setFilterClientId(e.target.value)} />
           </div>
           <div>
-            <Label>Filter Vendor ID</Label>
+            <Label>Filter Business Partner ID</Label>
             <Input type="number" min={1} step={1} value={filterVendorId} onChange={(e) => setFilterVendorId(e.target.value)} />
           </div>
           <label className="mt-8 flex items-center gap-2 text-sm">
@@ -146,7 +146,7 @@ export default function LinksPage() {
             <thead>
               <tr className="border-b text-left text-slate-500">
                 <th className="px-2 py-2">Client</th>
-                <th className="px-2 py-2">Vendor</th>
+                <th className="px-2 py-2">Business Partner</th>
                 <th className="px-2 py-2">Status</th>
                 <th className="px-2 py-2">Priority</th>
                 <th className="px-2 py-2">Actions</th>
@@ -158,7 +158,7 @@ export default function LinksPage() {
               ) : (data?.items ?? []).map((link) => (
                 <tr key={link.id} className="border-b">
                   <td className="px-2 py-2 text-xs">{formatId(link.client_id, "Client")}</td>
-                  <td className="px-2 py-2 text-xs">{formatId(link.vendor_id, "Vendor")}</td>
+                  <td className="px-2 py-2 text-xs">{formatId(link.vendor_id, "Business Partner")}</td>
                   <td className="px-2 py-2"><StatusChip value={link.status} /></td>
                   <td className="px-2 py-2">{link.priority}</td>
                   <td className="px-2 py-2">

@@ -41,6 +41,7 @@ def _to_response(job, *, applications_count: int = 0) -> JobResponse:
         status=job.status,
         priority=job.priority,
         intake_channel=job.intake_channel,
+        group_bu=job.group_bu,
         origin_client_id=job.origin_client_id,
         origin_vendor_id=job.origin_vendor_id,
         owner_user_id=job.owner_user_id,
@@ -93,6 +94,7 @@ def create_job_endpoint(
             status=payload.status,
             priority=payload.priority,
             intake_channel=payload.intake_channel,
+            group_bu=payload.group_bu,
             origin_client_id=payload.origin_client_id,
             origin_vendor_id=payload.origin_vendor_id,
         )
@@ -247,6 +249,7 @@ def update_job_endpoint(
             status=payload.status,
             priority=payload.priority,
             intake_channel=payload.intake_channel,
+            group_bu=payload.group_bu,
         )
     except (PermissionError, ValueError) as exc:
         code = status.HTTP_403_FORBIDDEN if isinstance(exc, PermissionError) else status.HTTP_400_BAD_REQUEST

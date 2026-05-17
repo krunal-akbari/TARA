@@ -14,6 +14,7 @@ import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useListPage } from "@/hooks/use-list-page";
 import { useSettingsCatalog } from "@/hooks/use-settings-catalog";
+import { useUserNameMap } from "@/hooks/use-user-name-map";
 import { getApiErrorMessage } from "@/lib/api/http";
 import { useAuthStore } from "@/lib/auth-store";
 import { queryKeys } from "@/lib/query-keys";
@@ -117,6 +118,7 @@ const CANDIDATE_COLUMN_OPTIONS: Array<{ key: ToggleableCandidateColumnKey; label
 
 const DEFAULT_VISIBLE_CANDIDATE_COLUMNS: ToggleableCandidateColumnKey[] =
   CANDIDATE_COLUMN_OPTIONS.map((option) => option.key);
+const CANDIDATE_CREATE_FORM_ID = "candidate-create-form";
 
 const CANDIDATE_COLUMN_DIMENSIONS: Record<string, { defaultWidth: number; minWidth: number }> = {
   selection: { defaultWidth: 56, minWidth: 56 },
@@ -226,6 +228,8 @@ export default function CandidatesPage() {
       return haystack.includes(search);
     });
   }, [data?.items, list.normalizedSearch]);
+  const candidateOwnerIds = useMemo(() => candidateItems.map((candidate) => candidate.owner_user_id), [candidateItems]);
+  const { getUserFirstName } = useUserNameMap(candidateOwnerIds);
 
   useEffect(() => {
     if (previewCandidateId === null) return;
@@ -491,8 +495,8 @@ export default function CandidatesPage() {
       toggleableKey: "ownerUserId",
       header: "Owner",
       headerClassName: "px-3 py-2 font-medium text-slate-600",
-      cellClassName: "px-3 py-2 tabular-nums text-slate-700",
-      render: (candidate) => candidate.owner_user_id,
+      cellClassName: "px-3 py-2 text-slate-700",
+      render: (candidate) => getUserFirstName(candidate.owner_user_id),
     },
     {
       key: "dedupeFingerprint",
@@ -731,7 +735,11 @@ export default function CandidatesPage() {
 
   const createFormContent = (
     <div className="overflow-hidden rounded border border-slate-200 bg-white">
-      <form className="grid xl:grid-cols-[minmax(0,1.65fr)_minmax(0,1fr)]" onSubmit={onCreate}>
+      <form
+        id={CANDIDATE_CREATE_FORM_ID}
+        className="grid xl:grid-cols-[minmax(0,1.65fr)_minmax(0,1fr)]"
+        onSubmit={onCreate}
+      >
         <div className="border-b border-slate-200 xl:border-b-0 xl:border-r xl:border-slate-200">
           <div className="flex items-center gap-2 border-b border-emerald-300 px-4 py-3 text-lg font-semibold text-slate-900">
             <UserRound className="size-5 text-emerald-600" />
@@ -1002,14 +1010,6 @@ export default function CandidatesPage() {
             </section>
           </div>
 
-          <div className="flex items-center justify-end gap-2 border-t border-slate-200 px-4 py-3">
-            <Button type="button" variant="ghost" onClick={() => list.setShowCreate(false)}>
-              Cancel
-            </Button>
-            <Button type="submit" disabled={createMutation.isPending || uploadResumeMutation.isPending}>
-              {createMutation.isPending || uploadResumeMutation.isPending ? "Creating..." : "Create Candidate"}
-            </Button>
-          </div>
         </div>
         <aside className="bg-slate-50 p-4">
           <div className="mb-3 border-b border-slate-200 pb-2">
@@ -1020,15 +1020,23 @@ export default function CandidatesPage() {
           </p>
           <div className="space-y-3 rounded border border-slate-200 bg-white p-3">
             <Input type="file" accept=".pdf,.docx,.txt" onChange={onResumeChange} />
-            <div className="flex justify-end">
+            <div className="flex justify-end gap-2">
+              <Button
+                type="submit"
+                variant="secondary"
+                disabled={createMutation.isPending || uploadResumeMutation.isPending}
+              >
+                Add Candidate
+              </Button>
               <Button
                 type="button"
-                variant="ghost"
+                variant="primary"
+                className="bg-emerald-600 hover:bg-emerald-700"
                 onClick={onExtractFromResume}
                 disabled={!resumeFile || extractMutation.isPending}
               >
                 <FileText className="mr-1 size-4" />
-                {extractMutation.isPending ? "parsing resume..." : "parse resume"}
+                {extractMutation.isPending ? "Parsing..." : "Parse"}
               </Button>
             </div>
             {resumeFile ? <p className="text-xs text-slate-600">Selected file: {resumeFile.name}</p> : null}
@@ -1058,6 +1066,12 @@ export default function CandidatesPage() {
       addButtonLabel="Add Candidate"
       showCreate={list.showCreate}
       onToggleCreate={list.toggleShowCreate}
+      createSubmitButton={{
+        formId: CANDIDATE_CREATE_FORM_ID,
+        label: "Create Candidate",
+        pendingLabel: "Creating...",
+        isPending: createMutation.isPending || uploadResumeMutation.isPending,
+      }}
       createForm={createFormContent}
       error={<ErrorBanner message={error} onDismiss={() => setError(null)} />}
       pagination={pagination}
@@ -1234,7 +1248,7 @@ export default function CandidatesPage() {
                     </div>
                     <div className="grid grid-cols-2 px-3 py-2 text-sm">
                       <span className={kvLabelClass}>Owner</span>
-                      <span className={cn(kvValueClass, "tabular-nums")}>{previewCandidate?.owner_user_id ?? "-"}</span>
+                      <span className={kvValueClass}>{getUserFirstName(previewCandidate?.owner_user_id)}</span>
                     </div>
                   </div>
                 </div>

@@ -46,7 +46,7 @@ type QuickAddItem = {
 const appTiles: NavLink[] = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, chipClass: "bg-sky-500" },
   { href: "/clients", label: "Client", icon: Building2, chipClass: "bg-blue-500" },
-  { href: "/vendors", label: "Vendor", icon: Building2, chipClass: "bg-indigo-500" },
+  { href: "/vendors", label: "Business Partner", icon: Building2, chipClass: "bg-indigo-500" },
   { href: "/jobs", label: "Jobs", icon: BriefcaseBusiness, chipClass: "bg-rose-500" },
   { href: "/candidates", label: "Candidate", icon: UsersRound, chipClass: "bg-emerald-500" },
   { href: "/settings/other", label: "Settings", icon: Settings, chipClass: "bg-slate-500" },

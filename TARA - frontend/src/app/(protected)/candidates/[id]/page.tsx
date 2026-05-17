@@ -17,6 +17,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useAuthStore } from "@/lib/auth-store";
 import { getApiErrorMessage } from "@/lib/api/http";
 import { useSettingsCatalog } from "@/hooks/use-settings-catalog";
+import { useUserNameMap } from "@/hooks/use-user-name-map";
 import { queryKeys } from "@/lib/query-keys";
 import { getCandidate, restoreCandidate, updateCandidate } from "@/lib/services/candidates";
 import { getClient } from "@/lib/services/clients";
@@ -319,6 +320,7 @@ export default function CandidateDetailPage() {
     enabled: hasValidId,
     refetchInterval: (query) => getResumeStatusPollInterval(query.state.data),
   });
+  const { getUserFirstName } = useUserNameMap([data?.owner_user_id]);
   const { data: resumesData, isLoading: resumesLoading } = resumesQuery;
 
   const { data: jobsData, isLoading: jobsLoading } = useQuery({
@@ -708,7 +710,7 @@ export default function CandidateDetailPage() {
                                 {(() => {
                                   const parts: string[] = [];
                                   if (job.origin_client_id) parts.push(`Client: ${clientNameMap.get(job.origin_client_id) ?? `#${job.origin_client_id}`}`);
-                                  if (job.origin_vendor_id) parts.push(`Vendor: ${vendorNameMap.get(job.origin_vendor_id) ?? `#${job.origin_vendor_id}`}`);
+                                  if (job.origin_vendor_id) parts.push(`Business Partner: ${vendorNameMap.get(job.origin_vendor_id) ?? `#${job.origin_vendor_id}`}`);
                                   return parts.length > 0 ? parts.join(" | ") : "No host assigned";
                                 })()}
                               </span>
@@ -734,7 +736,7 @@ export default function CandidateDetailPage() {
                 <div><p className="text-xs font-medium text-slate-500">Phone</p><p className="mt-0.5 text-slate-900">{data.phone || "-"}</p></div>
                 <div><p className="text-xs font-medium text-slate-500">Company</p><p className="mt-0.5 text-slate-900">{data.current_company || "-"}</p></div>
                 <div><p className="text-xs font-medium text-slate-500">Group (BU)</p><p className="mt-0.5 text-slate-900">{data.group_bu || "-"}</p></div>
-                <div><p className="text-xs font-medium text-slate-500">Owner</p><p className="mt-0.5 tabular-nums text-slate-900">#{data.owner_user_id}</p></div>
+                <div><p className="text-xs font-medium text-slate-500">Owner</p><p className="mt-0.5 text-slate-900">{getUserFirstName(data.owner_user_id)}</p></div>
               </div>
             </div>
 
@@ -910,7 +912,7 @@ export default function CandidateDetailPage() {
                     <div className={kvRowClass}><span className={kvLabelClass}>Company</span><span className={kvValueClass}>{data.current_company || "-"}</span></div>
                     <div className={kvRowClass}><span className={kvLabelClass}>Group (BU)</span><span className={kvValueClass}>{data.group_bu || "-"}</span></div>
                     <div className={kvRowClass}><span className={kvLabelClass}>Fingerprint</span><span className="break-all text-slate-900">{data.dedupe_fingerprint || "-"}</span></div>
-                    <div className="grid grid-cols-2 px-3 py-2 text-sm"><span className={kvLabelClass}>Owner</span><span className="tabular-nums text-slate-900">#{data.owner_user_id}</span></div>
+                    <div className="grid grid-cols-2 px-3 py-2 text-sm"><span className={kvLabelClass}>Owner</span><span className="text-slate-900">{getUserFirstName(data.owner_user_id)}</span></div>
                   </div>
                 </Card>
               </div>

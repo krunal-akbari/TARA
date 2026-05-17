@@ -14,6 +14,8 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
+import { useSettingsCatalog } from "@/hooks/use-settings-catalog";
+import { useUserNameMap } from "@/hooks/use-user-name-map";
 import { getApiErrorMessage } from "@/lib/api/http";
 import { queryKeys } from "@/lib/query-keys";
 import {
@@ -30,11 +32,10 @@ import { listVendors } from "@/lib/services/vendors";
 import { getVendor } from "@/lib/services/vendors";
 import { ClientVendorLink, Vendor } from "@/lib/types/entities";
 import { cn } from "@/lib/utils/cn";
-import { formatId, toTitleCase } from "@/lib/utils/format";
+import { toTitleCase } from "@/lib/utils/format";
 
 const NAME_MAX = 255;
 const ADDRESS_MAX = 512;
-const SECTOR_MAX = 128;
 
 const JOBS_PAGE_SIZE = 100;
 const LINKS_PAGE_SIZE = 100;
@@ -59,6 +60,7 @@ export default function ClientDetailPage() {
   const hasValidId = Number.isInteger(clientId) && clientId > 0;
 
   const queryClient = useQueryClient();
+  const { catalog } = useSettingsCatalog();
 
   const [name, setName] = useState("");
   const [address, setAddress] = useState("");
@@ -180,7 +182,15 @@ export default function ClientDetailPage() {
 
   const vendersCount = venderLinks.length;
   const mainPhone = contacts.find((contact) => Boolean(contact.phone))?.phone ?? "-";
-  const clientType = vendersCount > 0 ? "Vender" : "End Client";
+  const clientType = vendersCount > 0 ? "Business Partner" : "End Client";
+  const { getUserFirstName } = useUserNameMap([data?.owner_user_id]);
+  const clientCategoryOptions = useMemo(() => {
+    const values = [...catalog.client_category];
+    if (sector && !values.some((value) => value.toLowerCase() === sector.toLowerCase())) {
+      values.push(sector);
+    }
+    return values;
+  }, [catalog.client_category, sector]);
 
   const tabs = useMemo(
     () => [
@@ -189,7 +199,7 @@ export default function ClientDetailPage() {
       { id: "activity" as const, label: "Activity" },
       { id: "emails" as const, label: "Emails" },
       { id: "notes" as const, label: "Notes (0)" },
-      { id: "venders" as const, label: `Venders (${vendersCount})` },
+      { id: "venders" as const, label: `Business Partners (${vendersCount})` },
       { id: "submissions" as const, label: `Submissions (${submissionsCount})` },
     ],
     [vendersCount, submissionsCount],
@@ -224,7 +234,7 @@ export default function ClientDetailPage() {
       }
 
       if (typeValue === "vender" && (!selectedVenderId || Number.isNaN(Number(selectedVenderId)))) {
-        setError("Please select a vender.");
+        setError("Please select a business partner.");
         return;
       }
 
@@ -325,8 +335,8 @@ export default function ClientDetailPage() {
             <Card className="overflow-hidden p-0">
               <div className="border-b border-slate-200 px-3 py-2 text-sm font-semibold text-slate-900">Company Overview</div>
               <div className="grid grid-cols-2 border-b border-slate-200 px-3 py-2 text-sm">
-                <span className="text-slate-700">Owners</span>
-                <span className="text-slate-900">{formatId(data.owner_user_id, "Owner")}</span>
+                <span className="text-slate-700">Recruiter</span>
+                <span className="text-slate-900">{getUserFirstName(data.owner_user_id)}</span>
               </div>
               <div className="mt-2 border-t border-slate-200 px-3 py-2 text-sm text-slate-700">Company Description</div>
               <div className="border-t border-slate-200 px-3 py-2 text-sm text-slate-700">Client Contact Notes</div>
@@ -382,13 +392,17 @@ export default function ClientDetailPage() {
                 />
               </div>
               <div>
-                <Label>Sector</Label>
-                <Input
+                <Label>Category</Label>
+                <Select
                   value={sector}
                   onChange={(e) => setSector(e.target.value)}
-                  maxLength={SECTOR_MAX}
-                  placeholder="Industry sector"
-                />
+                >
+                  {clientCategoryOptions.map((option) => (
+                    <option key={option} value={option}>
+                      {toTitleCase(option)}
+                    </option>
+                  ))}
+                </Select>
               </div>
               <div>
                 <Label>Status</Label>
@@ -410,14 +424,14 @@ export default function ClientDetailPage() {
                 <Label>Type</Label>
                 <Select value={typeValue} onChange={(e) => setTypeValue(e.target.value === "vender" ? "vender" : "end_client")}>
                   <option value="end_client">End Client</option>
-                  <option value="vender">Vender</option>
+                  <option value="vender">Business Partner</option>
                 </Select>
               </div>
               {typeValue === "vender" ? (
                 <div className="sm:col-span-2">
-                  <Label>Vender</Label>
+                  <Label>Business Partner</Label>
                   <Select value={selectedVenderId} onChange={(e) => setSelectedVenderId(e.target.value)}>
-                    <option value="">Select vender</option>
+                    <option value="">Select business partner</option>
                     {(venderOptionsData?.items ?? []).map((vendor) => (
                       <option key={vendor.id} value={vendor.id}>
                         {vendor.name}
@@ -427,7 +441,7 @@ export default function ClientDetailPage() {
                 </div>
               ) : null}
               <div className="sm:col-span-2 text-xs text-slate-500">
-                Changing type to End Client marks linked venders inactive. Choosing Vender ensures the selected vender is linked.
+                Changing type to End Client marks linked business partners inactive. Choosing Business Partner ensures the selected business partner is linked.
               </div>
               <div className="sm:col-span-2 flex gap-2 pt-1">
                 <Button type="submit" disabled={updateMutation.isPending}>Save</Button>
@@ -451,17 +465,17 @@ export default function ClientDetailPage() {
     if (activeTab === "venders") {
       return (
         <Card>
-          <h2 className="text-lg font-semibold text-slate-900">Venders</h2>
-          {isVendorLinksLoading ? <p className="mt-3 text-sm text-slate-600">Loading venders...</p> : null}
+          <h2 className="text-lg font-semibold text-slate-900">Business Partners</h2>
+          {isVendorLinksLoading ? <p className="mt-3 text-sm text-slate-600">Loading business partners...</p> : null}
           {!isVendorLinksLoading && vendorLinks.length === 0 ? (
-            <p className="mt-3 text-sm text-slate-600">No venders linked to this client yet.</p>
+            <p className="mt-3 text-sm text-slate-600">No business partners linked to this client yet.</p>
           ) : null}
           {!isVendorLinksLoading && vendorLinks.length > 0 ? (
             <div className="mt-3 overflow-x-auto">
               <table className="min-w-full text-sm">
                 <thead>
                   <tr className="border-b text-left text-slate-500">
-                    <th className="px-2 py-2">Vender</th>
+                    <th className="px-2 py-2">Business Partner</th>
                     <th className="px-2 py-2">Status</th>
                     <th className="px-2 py-2">Priority</th>
                     <th className="px-2 py-2">Sector</th>
@@ -480,7 +494,7 @@ export default function ClientDetailPage() {
                               {vendor.name}
                             </Link>
                           ) : (
-                            <span className="font-medium text-slate-900">Vender #{link.vendor_id}</span>
+                            <span className="font-medium text-slate-900">Business Partner #{link.vendor_id}</span>
                           )}
                         </td>
                         <td className="px-2 py-2"><StatusChip value={linkStatus} /></td>
@@ -508,8 +522,10 @@ export default function ClientDetailPage() {
   }, [
     activeTab,
     address,
+    clientCategoryOptions,
     contactService,
     data,
+    getUserFirstName,
     id,
     isVendorLinksLoading,
     mainPhone,

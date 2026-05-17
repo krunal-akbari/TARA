@@ -32,6 +32,7 @@ def create_job(
     status: str,
     priority: str,
     intake_channel: str,
+    group_bu: str | None,
     origin_client_id: int | None,
     origin_vendor_id: int | None,
 ) -> Job:
@@ -46,6 +47,7 @@ def create_job(
         status=status,
         priority=normalized_priority,
         intake_channel=intake_channel,
+        group_bu=group_bu,
         origin_client_id=origin_client_id,
         origin_vendor_id=origin_vendor_id,
         owner_user_id=actor_user_id,
@@ -59,7 +61,13 @@ def create_job(
         entity_id=str(job.id),
         event_type="created",
         actor_user_id=actor_user_id,
-        payload={"title": title, "status": status, "priority": normalized_priority, "intake_channel": intake_channel},
+        payload={
+            "title": title,
+            "status": status,
+            "priority": normalized_priority,
+            "intake_channel": intake_channel,
+            "group_bu": group_bu,
+        },
     )
     db.commit()
     db.refresh(job)
@@ -130,6 +138,7 @@ def update_job(
     status: str | None,
     priority: str | None,
     intake_channel: str | None,
+    group_bu: str | None,
 ) -> Job:
     if not can_manage_or_own(roles=roles, owner_user_id=job.owner_user_id, actor_user_id=actor_user_id):
         raise PermissionError("Not allowed to update job")
@@ -148,6 +157,8 @@ def update_job(
         job.priority = normalized_priority
     if intake_channel is not None:
         job.intake_channel = intake_channel
+    if group_bu is not None:
+        job.group_bu = group_bu
 
     record_event(
         db,
@@ -156,7 +167,7 @@ def update_job(
         entity_id=str(job.id),
         event_type="updated",
         actor_user_id=actor_user_id,
-        payload={"title": job.title, "status": job.status, "priority": job.priority},
+        payload={"title": job.title, "status": job.status, "priority": job.priority, "group_bu": job.group_bu},
     )
     db.commit()
     db.refresh(job)

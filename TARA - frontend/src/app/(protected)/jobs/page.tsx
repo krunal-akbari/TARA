@@ -14,6 +14,8 @@ import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useListPage } from "@/hooks/use-list-page";
+import { useSettingsCatalog } from "@/hooks/use-settings-catalog";
+import { useUserNameMap } from "@/hooks/use-user-name-map";
 import { getApiErrorMessage } from "@/lib/api/http";
 import { useAuthStore } from "@/lib/auth-store";
 import { queryKeys } from "@/lib/query-keys";
@@ -59,8 +61,8 @@ const JOB_COLUMN_OPTIONS: Array<{ key: ToggleableJobColumnKey; label: string }> 
   { key: "priority", label: "Priority" },
   { key: "channel", label: "Channel" },
   { key: "originClient", label: "Origin Client" },
-  { key: "originVendor", label: "Origin Vendor" },
-  { key: "owner", label: "Owner" },
+  { key: "originVendor", label: "Origin Business Partner" },
+  { key: "owner", label: "BDA" },
   { key: "applications", label: "Applicants" },
   { key: "deletedAt", label: "Deleted At" },
   { key: "actions", label: "Actions" },
@@ -89,6 +91,7 @@ export default function JobsPage() {
   const queryClient = useQueryClient();
   const list = useListPage();
   const session = useAuthStore((s) => s.session);
+  const { catalog, defaults } = useSettingsCatalog();
   const columnMenuRef = useRef<HTMLDivElement>(null);
   const resizeStateRef = useRef<{ key: string; startX: number; startWidth: number; minWidth: number } | null>(null);
   const ownerName = useMemo(() => {
@@ -98,10 +101,13 @@ export default function JobsPage() {
     return toTitleCase(prefix);
   }, [session]);
 
+  const groupBuOptions = useMemo(() => catalog.group_bu, [catalog.group_bu]);
+  const defaultGroupBu = defaults.group_bu || groupBuOptions[0] || "";
+
   const [form, setForm] = useState({
     title: "",
     status: "draft",
-    groupBu: "",
+    groupBu: defaultGroupBu,
     jobType: "direct_client",
     openClosed: "open",
     priority: "hot",
@@ -150,11 +156,16 @@ export default function JobsPage() {
   const [activeResizeKey, setActiveResizeKey] = useState<string | null>(null);
   const isDirectClientType = form.jobType === "direct_client";
 
+  useEffect(() => {
+    if (!defaultGroupBu) return;
+    setForm((prev) => (prev.groupBu ? prev : { ...prev, groupBu: defaultGroupBu }));
+  }, [defaultGroupBu]);
+
   const resetCreateForm = () => {
     setForm({
       title: "",
       status: "draft",
-      groupBu: "",
+      groupBu: defaultGroupBu,
       jobType: "direct_client",
       openClosed: "open",
       priority: "hot",
@@ -252,6 +263,8 @@ export default function JobsPage() {
       return haystack.includes(search);
     });
   }, [data?.items, list.normalizedSearch]);
+  const jobOwnerIds = useMemo(() => jobItems.map((job) => job.owner_user_id), [jobItems]);
+  const { getUserFirstName } = useUserNameMap(jobOwnerIds);
 
   const pagination = list.getPagination(data?.total ?? 0);
   const selection = list.getSelectionHelpers(jobItems);
@@ -463,7 +476,7 @@ export default function JobsPage() {
     {
       key: "originVendor",
       toggleableKey: "originVendor",
-      header: "Origin Vendor",
+      header: "Origin Business Partner",
       headerClassName: "px-3 py-2 font-medium text-slate-900",
       cellClassName: "px-3 py-2 tabular-nums text-slate-800",
       defaultWidth: JOB_COLUMN_DIMENSIONS.originVendor.defaultWidth,
@@ -473,12 +486,12 @@ export default function JobsPage() {
     {
       key: "owner",
       toggleableKey: "owner",
-      header: "Owner",
+      header: "BDA",
       headerClassName: "px-3 py-2 font-medium text-slate-900",
-      cellClassName: "px-3 py-2 tabular-nums text-slate-800",
+      cellClassName: "px-3 py-2 text-slate-800",
       defaultWidth: JOB_COLUMN_DIMENSIONS.owner.defaultWidth,
       minWidth: JOB_COLUMN_DIMENSIONS.owner.minWidth,
-      render: (job) => job.owner_user_id,
+      render: (job) => getUserFirstName(job.owner_user_id),
     },
     {
       key: "applications",
@@ -603,6 +616,7 @@ export default function JobsPage() {
         description: form.description.trim(),
         status: form.status.trim(),
         intake_channel: form.jobType,
+        group_bu: form.groupBu.trim() || undefined,
         origin_client_id: matchedClientId,
         origin_vendor_id: matchedVendorId,
       });
@@ -629,7 +643,15 @@ export default function JobsPage() {
                 <option value="closed">Closed</option>
               </Select>
             </div>
-            <div><Label htmlFor="job-group-bu">Group (BU)</Label><Input id="job-group-bu" className={LINE_INPUT_CLASS} value={form.groupBu} onChange={(e) => setForm((p) => ({ ...p, groupBu: e.target.value }))} /></div>
+            <div>
+              <Label htmlFor="job-group-bu">Group (BU)</Label>
+              <Select id="job-group-bu" className={LINE_INPUT_CLASS} value={form.groupBu} onChange={(e) => setForm((p) => ({ ...p, groupBu: e.target.value }))}>
+                <option value="">{groupBuOptions.length > 0 ? "Select Group (BU)" : "No Group (BU) configured"}</option>
+                {groupBuOptions.map((option) => (
+                  <option key={option} value={option}>{toTitleCase(option.replace(/_/g, " "))}</option>
+                ))}
+              </Select>
+            </div>
             <div>
               <Label htmlFor="job-type">Job Type *</Label>
               <Select
@@ -721,7 +743,7 @@ export default function JobsPage() {
               ) : null}
             </div>
             <div className="relative">
-              <Label htmlFor="job-vendor">Vendors</Label>
+              <Label htmlFor="job-vendor">Business Partners</Label>
               <Input
                 id="job-vendor"
                 className={`${LINE_INPUT_CLASS} ${isDirectClientType ? "cursor-not-allowed opacity-50" : ""}`}
@@ -743,13 +765,13 @@ export default function JobsPage() {
                   setSelectedVendorId(null);
                   if (!isDirectClientType) setShowVendorSuggestions(true);
                 }}
-                placeholder={!isDirectClientType ? "Search vendor by name" : "Disabled for selected job type"}
+                placeholder={!isDirectClientType ? "Search business partner by name" : "Disabled for selected job type"}
                 autoComplete="off"
               />
               {!isDirectClientType && showVendorSuggestions ? (
                 <div id="job-vendor-suggestions" role="listbox" className="absolute z-20 mt-1 max-h-48 w-full overflow-auto rounded border border-slate-300 bg-white shadow-lg">
                   {vendorNameOptions.length === 0 ? (
-                    <p className="px-3 py-2 text-sm text-slate-600">No vendors found.</p>
+                    <p className="px-3 py-2 text-sm text-slate-600">No business partners found.</p>
                   ) : vendorNameOptions.map((vendor) => (
                     <button
                       key={vendor.id}
@@ -771,7 +793,7 @@ export default function JobsPage() {
               ) : null}
             </div>
             <div><Label htmlFor="job-start-date">Start Date</Label><Input id="job-start-date" className={LINE_INPUT_CLASS} type="date" value={form.startDate} onChange={(e) => setForm((p) => ({ ...p, startDate: e.target.value }))} /></div>
-            <div><Label htmlFor="job-owner">Owner</Label><Input id="job-owner" className={LINE_INPUT_CLASS} value={ownerName} readOnly /></div>
+            <div><Label htmlFor="job-owner">BDA</Label><Input id="job-owner" className={LINE_INPUT_CLASS} value={ownerName} readOnly /></div>
             <div className="sm:col-span-2"><Label htmlFor="job-assigned-to">Assigned To</Label><Input id="job-assigned-to" className={LINE_INPUT_CLASS} value={form.assignedTo} onChange={(e) => setForm((p) => ({ ...p, assignedTo: e.target.value }))} /></div>
           </div>
         </section>

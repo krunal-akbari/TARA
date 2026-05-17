@@ -60,6 +60,7 @@ export interface Job {
   status: string;
   priority: string;
   intake_channel: string;
+  group_bu: string | null;
   origin_client_id: number | null;
   origin_vendor_id: number | null;
   owner_user_id: number;

@@ -13,6 +13,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
+import { useUserNameMap } from "@/hooks/use-user-name-map";
 import { getApiErrorMessage } from "@/lib/api/http";
 import { queryKeys } from "@/lib/query-keys";
 import { createLink, listLinks, restoreLink, updateLink } from "@/lib/services/links";
@@ -25,7 +26,7 @@ import {
   updateVendorContact,
 } from "@/lib/services/vendors";
 import { cn } from "@/lib/utils/cn";
-import { formatDate, formatId, toTitleCase } from "@/lib/utils/format";
+import { formatDate, toTitleCase } from "@/lib/utils/format";
 
 type VendorTabId = "overview" | "edit" | "links" | "contacts";
 
@@ -98,8 +99,8 @@ function VendorLinkManager({ vendorId }: { vendorId: number }) {
   return (
     <div className="space-y-4">
       <div>
-        <h2 className="text-lg font-semibold text-slate-900">Vendor Links</h2>
-        <p className="mt-1 text-sm text-slate-600">Map this vendor to clients and manage link state.</p>
+        <h2 className="text-lg font-semibold text-slate-900">Business Partner Links</h2>
+        <p className="mt-1 text-sm text-slate-600">Map this business partner to clients and manage link state.</p>
       </div>
 
       <form className="grid gap-3 rounded border border-slate-200 p-3 sm:grid-cols-3" onSubmit={onCreateLink}>
@@ -152,11 +153,11 @@ function VendorLinkManager({ vendorId }: { vendorId: number }) {
           </thead>
           <tbody>
             {isLoadingLinks ? (
-              <tr><td className="px-2 py-3 text-slate-600" colSpan={4}>Loading vendor links...</td></tr>
+              <tr><td className="px-2 py-3 text-slate-600" colSpan={4}>Loading business partner links...</td></tr>
             ) : null}
 
             {!isLoadingLinks && (linksData?.items ?? []).length === 0 ? (
-              <tr><td className="px-2 py-3 text-slate-600" colSpan={4}>No links found for this vendor.</td></tr>
+              <tr><td className="px-2 py-3 text-slate-600" colSpan={4}>No links found for this business partner.</td></tr>
             ) : null}
 
             {(linksData?.items ?? []).map((link) => (
@@ -219,6 +220,7 @@ export default function VendorDetailPage() {
     queryFn: () => getVendor(id, true),
     enabled: hasValidId,
   });
+  const { getUserFirstName } = useUserNameMap([data?.owner_user_id]);
 
   const { data: contactList = [] } = useQuery({
     queryKey: queryKeys.vendors.contacts(id),
@@ -255,13 +257,13 @@ export default function VendorDetailPage() {
       queryClient.invalidateQueries({ queryKey: queryKeys.vendors.detail(id) });
       queryClient.invalidateQueries({ queryKey: queryKeys.vendors.all });
     },
-    onError: (err) => setError(getApiErrorMessage(err, "Failed to update vendor")),
+    onError: (err) => setError(getApiErrorMessage(err, "Failed to update business partner")),
   });
 
   const restoreMutation = useMutation({
     mutationFn: () => restoreVendor(id),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.vendors.detail(id) }),
-    onError: (err) => setError(getApiErrorMessage(err, "Failed to restore vendor")),
+    onError: (err) => setError(getApiErrorMessage(err, "Failed to restore business partner")),
   });
 
   const onSubmit = (event: FormEvent) => {
@@ -308,7 +310,7 @@ export default function VendorDetailPage() {
   const overviewStatus = data?.deleted_at ? "Deleted" : data ? toLabel(data.status) : "-";
 
   if (!hasValidId) {
-    return <ErrorBanner message="Invalid vendor id." />;
+    return <ErrorBanner message="Invalid business partner id." />;
   }
 
   return (
@@ -317,7 +319,7 @@ export default function VendorDetailPage() {
 
       {isLoading ? (
         <Card>
-          <p className="text-sm text-slate-600">Loading vendor details...</p>
+          <p className="text-sm text-slate-600">Loading business partner details...</p>
         </Card>
       ) : null}
 
@@ -341,7 +343,7 @@ export default function VendorDetailPage() {
                   <p className="mt-1 tabular-nums text-slate-900">{data.id}</p>
                 </div>
                 <div>
-                  <p className="text-xs font-medium text-slate-500">Vendor Name</p>
+                  <p className="text-xs font-medium text-slate-500">Business Partner Name</p>
                   <p className="mt-1 text-slate-900">{data.name}</p>
                 </div>
                 <div>
@@ -353,8 +355,8 @@ export default function VendorDetailPage() {
                   <p className="mt-1 text-slate-900">{data.sector || "-"}</p>
                 </div>
                 <div>
-                  <p className="text-xs font-medium text-slate-500">Owner</p>
-                  <p className="mt-1 tabular-nums text-slate-900">{formatId(data.owner_user_id, "Owner")}</p>
+                  <p className="text-xs font-medium text-slate-500">Recruiter</p>
+                  <p className="mt-1 text-slate-900">{getUserFirstName(data.owner_user_id)}</p>
                 </div>
               </div>
             </div>
@@ -382,7 +384,7 @@ export default function VendorDetailPage() {
 
           {activeTab === "overview" ? (
             <Card className="overflow-hidden p-0">
-              <div className="border-b border-slate-200 px-3 py-2 text-sm font-semibold text-slate-900">Vendor Overview</div>
+              <div className="border-b border-slate-200 px-3 py-2 text-sm font-semibold text-slate-900">Business Partner Overview</div>
               <div className="grid gap-0 text-sm">
                 <div className="grid grid-cols-2 border-b border-slate-200 px-3 py-2"><span className="text-slate-700">Address</span><span className="text-slate-900">{data.address || "-"}</span></div>
                 <div className="grid grid-cols-2 border-b border-slate-200 px-3 py-2"><span className="text-slate-700">Sector</span><span className="text-slate-900">{data.sector || "-"}</span></div>
@@ -403,7 +405,7 @@ export default function VendorDetailPage() {
                       value={name}
                       onChange={(e) => setName(e.target.value)}
                       maxLength={NAME_MAX}
-                      placeholder="Vendor name"
+                      placeholder="Business partner name"
                       required
                     />
                   </div>
@@ -454,7 +456,7 @@ export default function VendorDetailPage() {
               <ContactManager
                 queryKey={queryKeys.vendors.contacts(id)}
                 service={contactService}
-                title="Vendor Contacts"
+                title="Business Partner Contacts"
               />
             </Card>
           ) : null}

@@ -10,6 +10,7 @@ class JobCreate(BaseModel):
     status: str = "draft"
     priority: Literal["hot", "warm", "warn", "cold"] = "warm"
     intake_channel: str = "direct_client"
+    group_bu: str | None = Field(default=None, max_length=255)
     origin_client_id: int | None = None
     origin_vendor_id: int | None = None
 
@@ -20,6 +21,7 @@ class JobUpdate(BaseModel):
     status: str | None = None
     priority: Literal["hot", "warm", "warn", "cold"] | None = None
     intake_channel: str | None = None
+    group_bu: str | None = Field(default=None, max_length=255)
 
 
 class JobResponse(BaseModel):
@@ -30,6 +32,7 @@ class JobResponse(BaseModel):
     status: str
     priority: str
     intake_channel: str
+    group_bu: str | None = None
     origin_client_id: int | None = None
     origin_vendor_id: int | None = None
     owner_user_id: int

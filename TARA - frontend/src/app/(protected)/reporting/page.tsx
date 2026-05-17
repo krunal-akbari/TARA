@@ -24,7 +24,7 @@ export default function ReportingPage() {
           <div className="grid gap-3 sm:grid-cols-2">
             <p>Jobs Total: <strong>{data.jobs_total}</strong></p>
             <p>Clients Total: <strong>{data.clients_total}</strong></p>
-            <p>Vendors Total: <strong>{data.vendors_total}</strong></p>
+            <p>Business Partners Total: <strong>{data.vendors_total}</strong></p>
             <p>Candidates Total: <strong>{data.candidates_total}</strong></p>
             <p>Active Links Total: <strong>{data.active_links_total}</strong></p>
             <p>Route Transitions Total: <strong>{data.route_transitions_total}</strong></p>

@@ -14,6 +14,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { useSettingsCatalog } from "@/hooks/use-settings-catalog";
+import { useUserNameMap } from "@/hooks/use-user-name-map";
 import { getApiErrorMessage } from "@/lib/api/http";
 import { queryKeys } from "@/lib/query-keys";
 import { getJob, listJobApplications, restoreJob, updateJob } from "@/lib/services/jobs";
@@ -33,11 +35,13 @@ export default function JobDetailPage() {
   const parsedJobId = Number(id);
   const hasValidId = Number.isInteger(parsedJobId) && parsedJobId > 0;
   const queryClient = useQueryClient();
+  const { catalog } = useSettingsCatalog();
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [status, setStatus] = useState("draft");
   const [channel, setChannel] = useState("direct_client");
+  const [groupBu, setGroupBu] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<JobTabId>("overview");
 
@@ -46,6 +50,7 @@ export default function JobDetailPage() {
     queryFn: () => getJob(id, true),
     enabled: hasValidId,
   });
+  const { getUserFirstName } = useUserNameMap([data?.owner_user_id]);
 
   const { data: applicationsData, isLoading: applicationsLoading } = useQuery({
     queryKey: queryKeys.jobs.applications(id, 1),
@@ -59,7 +64,14 @@ export default function JobDetailPage() {
     setDescription(data.description);
     setStatus(data.status);
     setChannel(data.intake_channel);
+    setGroupBu(data.group_bu ?? "");
   }, [data]);
+
+  const groupBuOptions = useMemo(() => {
+    const configured = catalog.group_bu;
+    if (groupBu && !configured.includes(groupBu)) return [...configured, groupBu];
+    return configured;
+  }, [catalog.group_bu, groupBu]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -69,7 +81,14 @@ export default function JobDetailPage() {
   }, []);
 
   const updateMutation = useMutation({
-    mutationFn: () => updateJob(id, { title: title.trim(), description, status, intake_channel: channel }),
+    mutationFn: () =>
+      updateJob(id, {
+        title: title.trim(),
+        description,
+        status,
+        intake_channel: channel,
+        group_bu: groupBu || undefined,
+      }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.jobs.detail(id) });
       queryClient.invalidateQueries({ queryKey: queryKeys.jobs.all });
@@ -155,7 +174,7 @@ export default function JobDetailPage() {
                   <p className="mt-1 tabular-nums text-slate-900">{data.origin_client_id ?? "-"}</p>
                 </div>
                 <div>
-                  <p className="text-xs font-medium text-slate-500">Origin Vendor</p>
+                  <p className="text-xs font-medium text-slate-500">Origin Business Partner</p>
                   <p className="mt-1 tabular-nums text-slate-900">{data.origin_vendor_id ?? "-"}</p>
                 </div>
                 <div>
@@ -191,7 +210,8 @@ export default function JobDetailPage() {
               <Card className="overflow-hidden p-0">
                 <div className="border-b border-slate-200 px-3 py-2 text-sm font-semibold text-slate-900">Job Overview</div>
                 <div className="grid gap-0 text-sm">
-                  <div className="grid grid-cols-2 border-b border-slate-200 px-3 py-2"><span className="text-slate-700">Owner</span><span className="tabular-nums text-slate-900">{data.owner_user_id}</span></div>
+                  <div className="grid grid-cols-2 border-b border-slate-200 px-3 py-2"><span className="text-slate-700">BDA</span><span className="text-slate-900">{getUserFirstName(data.owner_user_id)}</span></div>
+                  <div className="grid grid-cols-2 border-b border-slate-200 px-3 py-2"><span className="text-slate-700">Group (BU)</span><span className="text-slate-900">{data.group_bu ? toLabel(data.group_bu) : "-"}</span></div>
                   <div className="grid grid-cols-2 border-b border-slate-200 px-3 py-2"><span className="text-slate-700">Deleted At</span><span className="text-slate-900">{formatDate(data.deleted_at)}</span></div>
                   <div className="grid grid-cols-2 px-3 py-2"><span className="text-slate-700">Applied Candidates</span><span className="tabular-nums text-slate-900">{applicantsCount}</span></div>
                 </div>
@@ -252,6 +272,15 @@ export default function JobDetailPage() {
                   <Select value={channel} onChange={(e) => setChannel(e.target.value)}>
                     {JOB_INTAKE_CHANNELS.map((item) => (
                       <option key={item} value={item}>{item}</option>
+                    ))}
+                  </Select>
+                </div>
+                <div>
+                  <Label>Group (BU)</Label>
+                  <Select value={groupBu} onChange={(e) => setGroupBu(e.target.value)}>
+                    <option value="">{groupBuOptions.length > 0 ? "Select Group (BU)" : "No Group (BU) configured"}</option>
+                    {groupBuOptions.map((item) => (
+                      <option key={item} value={item}>{toLabel(item)}</option>
                     ))}
                   </Select>
                 </div>

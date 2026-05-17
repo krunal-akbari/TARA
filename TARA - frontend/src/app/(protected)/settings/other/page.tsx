@@ -17,9 +17,14 @@ type SectionConfig = {
 
 const SETTINGS_SECTIONS: SectionConfig[] = [
   {
+    key: "client_category",
+    title: "Client Category",
+    description: "Default category values for clients (example: Finance, IT, Hospitality).",
+  },
+  {
     key: "candidate_status",
     title: "Candidate Status",
-    description: "Used in candidate forms (example: new, active, on_hold).",
+    description: "Used in candidate forms (example: New, Active, On Hold).",
   },
   {
     key: "candidate_source",
@@ -60,6 +65,7 @@ function toTitle(value: string) {
 export default function SettingsOtherPage() {
   const { catalog, defaults, setValues, setDefault, resetDefaults } = useSettingsCatalog();
   const [drafts, setDrafts] = useState<Record<SettingsCatalogKey, string>>({
+    client_category: "",
     candidate_status: "",
     candidate_source: "",
     candidate_employee_type: "",
@@ -68,6 +74,7 @@ export default function SettingsOtherPage() {
     candidate_role: "",
   });
   const [editing, setEditing] = useState<Record<SettingsCatalogKey, { original: string; value: string } | null>>({
+    client_category: null,
     candidate_status: null,
     candidate_source: null,
     candidate_employee_type: null,
@@ -188,7 +195,7 @@ export default function SettingsOtherPage() {
                               className="h-8"
                             />
                           ) : (
-                            value
+                            toTitle(value)
                           )}
                         </td>
                         <td className="px-2 py-2 text-slate-600">

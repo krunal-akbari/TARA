@@ -9,6 +9,7 @@ import { useMemo } from "react";
 import { ErrorBanner } from "@/components/common/error-banner";
 import { StatusChip } from "@/components/common/status-chip";
 import { Card } from "@/components/ui/card";
+import { useUserNameMap } from "@/hooks/use-user-name-map";
 import { queryKeys } from "@/lib/query-keys";
 import { getClient, listClientContacts } from "@/lib/services/clients";
 import { listJobs } from "@/lib/services/jobs";
@@ -141,6 +142,7 @@ export default function ClientNetworkPage() {
     [relatedJobs, clientId],
   );
   const vendorJobsCount = relatedJobs.length - directJobsCount;
+  const { getUserFirstName } = useUserNameMap([client?.owner_user_id]);
   const activeLinksCount = linkItems.filter((link) => link.status === "active" && !link.deleted_at).length;
   const deletedLinksCount = linkItems.filter((link) => Boolean(link.deleted_at)).length;
 
@@ -164,20 +166,20 @@ export default function ClientNetworkPage() {
   return (
     <div>
       <ErrorBanner message={clientError ? "Failed to load client details." : null} />
-      <ErrorBanner message={linksError ? "Failed to load vendor connections." : null} />
+      <ErrorBanner message={linksError ? "Failed to load business partner connections." : null} />
       <ErrorBanner message={jobsError ? "Failed to load jobs history." : null} />
       <ErrorBanner message={contactsError ? "Failed to load contact details." : null} />
 
       <section className="mb-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         <Card className="p-4">
-          <p className="text-xs font-medium uppercase text-slate-500">Vendor Connections</p>
+          <p className="text-xs font-medium uppercase text-slate-500">Business Partner Connections</p>
           <p className="mt-1 text-balance text-2xl font-semibold tabular-nums text-slate-900">{linkItems.length}</p>
           <p className="mt-1 text-xs text-slate-600">Active: <span className="tabular-nums">{activeLinksCount}</span> | Deleted: <span className="tabular-nums">{deletedLinksCount}</span></p>
         </Card>
         <Card className="p-4">
           <p className="text-xs font-medium uppercase text-slate-500">Jobs Posted</p>
           <p className="mt-1 text-balance text-2xl font-semibold tabular-nums text-slate-900">{relatedJobs.length}</p>
-          <p className="mt-1 text-xs text-slate-600">Direct: <span className="tabular-nums">{directJobsCount}</span> | Via Vendors: <span className="tabular-nums">{vendorJobsCount}</span></p>
+          <p className="mt-1 text-xs text-slate-600">Direct: <span className="tabular-nums">{directJobsCount}</span> | Via Business Partners: <span className="tabular-nums">{vendorJobsCount}</span></p>
         </Card>
         <Card className="p-4">
           <p className="text-xs font-medium uppercase text-slate-500">Client Status</p>
@@ -187,7 +189,7 @@ export default function ClientNetworkPage() {
         <Card className="p-4">
           <p className="text-xs font-medium uppercase text-slate-500">Contact Count</p>
           <p className="mt-1 text-balance text-2xl font-semibold tabular-nums text-slate-900">{contacts.length}</p>
-          <p className="mt-1 text-xs text-slate-600">Owner ID: <span className="tabular-nums">{client?.owner_user_id ?? "-"}</span></p>
+          <p className="mt-1 text-xs text-slate-600">Recruiter: <span>{getUserFirstName(client?.owner_user_id)}</span></p>
         </Card>
       </section>
 
@@ -195,12 +197,12 @@ export default function ClientNetworkPage() {
         <Card className="xl:col-span-2">
           <div className="mb-3 flex items-center gap-2">
             <Link2 className="size-4 text-sky-700" />
-            <h2 className="text-balance text-lg font-semibold text-slate-900">Connected Vendors</h2>
+            <h2 className="text-balance text-lg font-semibold text-slate-900">Connected Business Partners</h2>
           </div>
-          {isLinksLoading ? <p className="text-sm text-slate-600">Loading vendor connections...</p> : null}
+          {isLinksLoading ? <p className="text-sm text-slate-600">Loading business partner connections...</p> : null}
           {!isLinksLoading && linkItems.length === 0 ? (
             <p className="text-pretty text-sm text-slate-600">
-              No vendor connections found for this client.{" "}
+              No business partner connections found for this client.{" "}
               <Link href="/links" className="font-medium text-blue-700 hover:underline">Create or manage links</Link>.
             </p>
           ) : null}
@@ -209,10 +211,10 @@ export default function ClientNetworkPage() {
               <table className="min-w-full text-sm">
                 <thead>
                   <tr className="border-b text-left text-slate-500">
-                    <th className="px-2 py-2">Vendor</th>
+                    <th className="px-2 py-2">Business Partner</th>
                     <th className="px-2 py-2">Link Status</th>
                     <th className="px-2 py-2">Priority</th>
-                    <th className="px-2 py-2">Vendor Status</th>
+                    <th className="px-2 py-2">Business Partner Status</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -228,7 +230,7 @@ export default function ClientNetworkPage() {
                                 {vendor.name}
                               </Link>
                             ) : (
-                              <span>Vendor #{link.vendor_id}</span>
+                              <span>Business Partner #{link.vendor_id}</span>
                             )}
                           </div>
                           <div className="text-xs text-slate-500">{vendor?.sector || "-"}</div>
@@ -288,7 +290,7 @@ export default function ClientNetworkPage() {
         {isJobsLoading || isClientLoading ? <p className="text-sm text-slate-600">Loading jobs history...</p> : null}
         {!isJobsLoading && relatedJobs.length === 0 ? (
           <p className="text-pretty text-sm text-slate-600">
-            No jobs found for this client or its linked vendors.{" "}
+            No jobs found for this client or its linked business partners.{" "}
             <Link href="/jobs" className="font-medium text-blue-700 hover:underline">Create a job</Link>.
           </p>
         ) : null}
@@ -307,7 +309,7 @@ export default function ClientNetworkPage() {
               <tbody>
                 {relatedJobs.map((job) => {
                   const postedThrough = job.origin_vendor_id
-                    ? vendorById.get(job.origin_vendor_id)?.name || `Vendor #${job.origin_vendor_id}`
+                    ? vendorById.get(job.origin_vendor_id)?.name || `Business Partner #${job.origin_vendor_id}`
                     : "Direct Client";
                   return (
                     <tr key={job.id} className="border-b">

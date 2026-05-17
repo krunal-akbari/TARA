@@ -38,6 +38,7 @@ def init_db() -> None:
 
     Base.metadata.create_all(bind=engine)
     _ensure_jobs_priority_column()
+    _ensure_jobs_group_bu_column()
     _ensure_candidate_hr_notes_columns()
     _ensure_candidate_group_bu_column()
     _ensure_tenant_resume_upload_limit_column()
@@ -54,6 +55,19 @@ def _ensure_jobs_priority_column() -> None:
 
     with engine.begin() as connection:
         connection.execute(text("ALTER TABLE jobs ADD COLUMN priority VARCHAR(16) NOT NULL DEFAULT 'warm'"))
+
+
+def _ensure_jobs_group_bu_column() -> None:
+    inspector = inspect(engine)
+    if not inspector.has_table("jobs"):
+        return
+
+    job_columns = {column["name"] for column in inspector.get_columns("jobs")}
+    if "group_bu" in job_columns:
+        return
+
+    with engine.begin() as connection:
+        connection.execute(text("ALTER TABLE jobs ADD COLUMN group_bu VARCHAR(255)"))
 
 
 def _ensure_candidate_hr_notes_columns() -> None:

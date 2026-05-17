@@ -13,11 +13,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useListPage } from "@/hooks/use-list-page";
+import { useUserNameMap } from "@/hooks/use-user-name-map";
 import { getApiErrorMessage } from "@/lib/api/http";
 import { useAuthStore } from "@/lib/auth-store";
 import { queryKeys } from "@/lib/query-keys";
 import { listClients } from "@/lib/services/clients";
-import { createVendor, createVendorContact, listVendors, restoreVendor } from "@/lib/services/vendors";
+import { createVendor, listVendors, restoreVendor } from "@/lib/services/vendors";
 import { toTitleCase, lineAddress } from "@/lib/utils/format";
 import { LINE_INPUT_CLASS, getRowClassName } from "@/lib/utils/table-styles";
 
@@ -35,9 +36,7 @@ export default function VendorsPage() {
   }, [setIncludeDeleted]);
 
   const [form, setForm] = useState({
-    first_name: "",
-    middle_name: "",
-    last_name: "",
+    name: "",
     title: "",
     client_name: "",
     email1: "",
@@ -62,11 +61,6 @@ export default function VendorsPage() {
     const prefix = session?.user?.email?.split("@")[0] ?? "Current User";
     return toTitleCase(prefix);
   }, [session]);
-  const vendorNamePreview = useMemo(
-    () => [form.first_name.trim(), form.middle_name.trim(), form.last_name.trim()].filter(Boolean).join(" "),
-    [form.first_name, form.middle_name, form.last_name],
-  );
-
   const { data, isLoading } = useQuery({
     queryKey: queryKeys.vendors.list(list.page, true, list.normalizedSearch),
     queryFn: () =>
@@ -79,6 +73,8 @@ export default function VendorsPage() {
   });
 
   const vendorItems = useMemo(() => data?.items ?? [], [data?.items]);
+  const vendorOwnerIds = useMemo(() => vendorItems.map((vendor) => vendor.owner_user_id), [vendorItems]);
+  const { getUserFirstName } = useUserNameMap(vendorOwnerIds);
   const pagination = list.getPagination(data?.total ?? 0);
   const selection = list.getSelectionHelpers(vendorItems);
 
@@ -87,14 +83,12 @@ export default function VendorsPage() {
   const restoreMutation = useMutation({
     mutationFn: restoreVendor,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.vendors.all }),
-    onError: (err) => setError(getApiErrorMessage(err, "Failed to restore vendor")),
+    onError: (err) => setError(getApiErrorMessage(err, "Failed to restore business partner")),
   });
 
   const resetCreateForm = () => {
     setForm({
-      first_name: "",
-      middle_name: "",
-      last_name: "",
+      name: "",
       title: "",
       client_name: "",
       email1: "",
@@ -118,13 +112,10 @@ export default function VendorsPage() {
     event.preventDefault();
     setError(null);
 
-    const firstName = form.first_name.trim();
-    const middleName = form.middle_name.trim();
-    const lastName = form.last_name.trim();
-    const fullName = [firstName, middleName, lastName].filter(Boolean).join(" ");
+    const businessPartnerName = form.name.trim();
 
     const payload = {
-      name: fullName,
+      name: businessPartnerName,
       status: "active",
       address: lineAddress([
         form.address1,
@@ -135,12 +126,8 @@ export default function VendorsPage() {
       sector: form.desired_categories.trim() ? form.desired_categories.trim().slice(0, SECTOR_MAX) : null,
     };
 
-    if (!firstName || !lastName) {
-      setError("First Name and Last Name are required");
-      return;
-    }
-    if (!form.email1.trim()) {
-      setError("Email 1 is required");
+    if (!businessPartnerName) {
+      setError("Business Partner Name is required");
       return;
     }
 
@@ -158,15 +145,9 @@ export default function VendorsPage() {
         matchedClientId = exact?.id ?? null;
       }
 
-      const createdVendor = await createVendorMutation.mutateAsync({
+      await createVendorMutation.mutateAsync({
         ...payload,
         client_ids: matchedClientId ? [matchedClientId] : null,
-      });
-      await createVendorContact(createdVendor.id, {
-        first_name: firstName,
-        last_name: lastName,
-        email: form.email1.trim(),
-        phone: form.direct_phone.trim() || form.mobile_phone.trim() || null,
       });
 
       resetCreateForm();
@@ -174,19 +155,16 @@ export default function VendorsPage() {
       queryClient.invalidateQueries({ queryKey: queryKeys.clients.all });
       queryClient.invalidateQueries({ queryKey: queryKeys.links.all });
     } catch (err) {
-      setError(getApiErrorMessage(err, "Failed to create vendor"));
+      setError(getApiErrorMessage(err, "Failed to create business partner"));
     }
   };
 
   const createFormContent = (
     <form className="space-y-4" onSubmit={onCreate}>
       <section className="overflow-hidden rounded border border-slate-200 bg-white">
-        <div className="border-b border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-900">Contact Information (Vendor Name)</div>
+        <div className="border-b border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-900">Business Partner Information</div>
         <div className="grid gap-3 px-3 py-3 sm:grid-cols-2">
-          <div className="sm:col-span-2"><Label htmlFor="vendor-name">Vendor Name</Label><Input id="vendor-name" className={LINE_INPUT_CLASS} value={vendorNamePreview} readOnly /></div>
-          <div><Label htmlFor="vendor-first-name">First Name *</Label><Input id="vendor-first-name" className={LINE_INPUT_CLASS} value={form.first_name} onChange={(e) => setForm((p) => ({ ...p, first_name: e.target.value }))} maxLength={NAME_MAX} /></div>
-          <div><Label htmlFor="vendor-middle-name">Middle Name</Label><Input id="vendor-middle-name" className={LINE_INPUT_CLASS} value={form.middle_name} onChange={(e) => setForm((p) => ({ ...p, middle_name: e.target.value }))} maxLength={NAME_MAX} /></div>
-          <div><Label htmlFor="vendor-last-name">Last Name *</Label><Input id="vendor-last-name" className={LINE_INPUT_CLASS} value={form.last_name} onChange={(e) => setForm((p) => ({ ...p, last_name: e.target.value }))} maxLength={NAME_MAX} /></div>
+          <div className="sm:col-span-2"><Label htmlFor="vendor-name">Business Partner Name *</Label><Input id="vendor-name" className={LINE_INPUT_CLASS} value={form.name} onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))} maxLength={NAME_MAX} /></div>
           <div><Label htmlFor="vendor-title">Title</Label><Input id="vendor-title" className={LINE_INPUT_CLASS} value={form.title} onChange={(e) => setForm((p) => ({ ...p, title: e.target.value }))} maxLength={NAME_MAX} /></div>
           <div className="sm:col-span-2"><Label htmlFor="vendor-client">Client</Label><Input id="vendor-client" className={LINE_INPUT_CLASS} value={form.client_name} onChange={(e) => setForm((p) => ({ ...p, client_name: e.target.value }))} placeholder="Exact client name" maxLength={NAME_MAX} /></div>
         </div>
@@ -195,7 +173,7 @@ export default function VendorsPage() {
       <section className="overflow-hidden rounded border border-slate-200 bg-white">
         <div className="border-b border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-900">Contact Info</div>
         <div className="grid gap-3 px-3 py-3 sm:grid-cols-2">
-          <div><Label htmlFor="vendor-email1">Email 1 *</Label><Input id="vendor-email1" className={LINE_INPUT_CLASS} value={form.email1} onChange={(e) => setForm((p) => ({ ...p, email1: e.target.value }))} maxLength={NAME_MAX} /></div>
+          <div><Label htmlFor="vendor-email1">Email 1</Label><Input id="vendor-email1" className={LINE_INPUT_CLASS} value={form.email1} onChange={(e) => setForm((p) => ({ ...p, email1: e.target.value }))} maxLength={NAME_MAX} /></div>
           <div><Label htmlFor="vendor-email2">Email 2</Label><Input id="vendor-email2" className={LINE_INPUT_CLASS} value={form.email2} onChange={(e) => setForm((p) => ({ ...p, email2: e.target.value }))} maxLength={NAME_MAX} /></div>
           <div><Label htmlFor="vendor-direct-phone">Direct Phone</Label><Input id="vendor-direct-phone" className={LINE_INPUT_CLASS} value={form.direct_phone} onChange={(e) => setForm((p) => ({ ...p, direct_phone: e.target.value }))} maxLength={NAME_MAX} /></div>
           <div><Label htmlFor="vendor-mobile-phone">Mobile Phone</Label><Input id="vendor-mobile-phone" className={LINE_INPUT_CLASS} value={form.mobile_phone} onChange={(e) => setForm((p) => ({ ...p, mobile_phone: e.target.value }))} maxLength={NAME_MAX} /></div>
@@ -208,7 +186,7 @@ export default function VendorsPage() {
           <div className="sm:col-span-2"><Label htmlFor="vendor-desired-categories">Desired Categories</Label><Input id="vendor-desired-categories" className={LINE_INPUT_CLASS} value={form.desired_categories} onChange={(e) => setForm((p) => ({ ...p, desired_categories: e.target.value }))} maxLength={SECTOR_MAX} /></div>
           <div className="sm:col-span-2"><Label htmlFor="vendor-desired-skills">Desired Skills</Label><Input id="vendor-desired-skills" className={LINE_INPUT_CLASS} value={form.desired_skills} onChange={(e) => setForm((p) => ({ ...p, desired_skills: e.target.value }))} maxLength={NAME_MAX} /></div>
           <div className="sm:col-span-2"><Label htmlFor="vendor-comments">General Contact Comments</Label><Textarea id="vendor-comments" className="min-h-20 rounded-none border-0 border-b border-slate-300 bg-transparent px-0 shadow-none focus-visible:ring-0" value={form.comments} onChange={(e) => setForm((p) => ({ ...p, comments: e.target.value }))} /></div>
-          <div className="sm:col-span-2"><Label htmlFor="vendor-owner-full-name">Owner Full Name</Label><Input id="vendor-owner-full-name" className={LINE_INPUT_CLASS} value={ownerName} readOnly /></div>
+          <div className="sm:col-span-2"><Label htmlFor="vendor-owner-full-name">Recruiter Full Name</Label><Input id="vendor-owner-full-name" className={LINE_INPUT_CLASS} value={ownerName} readOnly /></div>
         </div>
       </section>
       <div className="flex justify-end gap-2 pt-2">
@@ -223,13 +201,13 @@ export default function VendorsPage() {
   return (
     <ListPageShell
       icon={<Building2 className="size-5 text-sky-600" />}
-      title="Vendors"
+      title="Business Partners"
       search={list.search}
       onSearchChange={list.setSearch}
       includeDeleted={true}
       onIncludeDeletedChange={() => undefined}
       showIncludeDeleted={false}
-      addButtonLabel="Add Vendor"
+      addButtonLabel="Add Business Partner"
       showCreate={list.showCreate}
       onToggleCreate={list.toggleShowCreate}
       createForm={createFormContent}
@@ -240,14 +218,14 @@ export default function VendorsPage() {
         <thead className="sticky top-0 z-10 bg-white">
           <tr className="border-b border-slate-300">
             <th className="w-16 px-3 py-2">
-              <input type="checkbox" checked={selection.allSelected} onChange={selection.toggleSelectAll} aria-label="Select all vendors" />
+              <input type="checkbox" checked={selection.allSelected} onChange={selection.toggleSelectAll} aria-label="Select all business partners" />
             </th>
             <th className="w-24 px-3 py-2 font-medium text-slate-900">ID</th>
-            <th className="px-3 py-2 font-medium text-slate-900">Vendor Name</th>
+            <th className="px-3 py-2 font-medium text-slate-900">Business Partner Name</th>
             <th className="w-40 px-3 py-2 font-medium text-slate-900">Status</th>
             <th className="w-52 px-3 py-2 font-medium text-slate-900">Sector</th>
             <th className="w-[26rem] px-3 py-2 font-medium text-slate-900">Address</th>
-            <th className="w-28 px-3 py-2 font-medium text-slate-900">Owner</th>
+            <th className="w-28 px-3 py-2 font-medium text-slate-900">Recruiter</th>
             <th className="w-40 px-3 py-2 font-medium text-slate-900">Actions</th>
           </tr>
         </thead>
@@ -257,7 +235,7 @@ export default function VendorsPage() {
           ) : null}
 
           {!isLoading && vendorItems.length === 0 ? (
-            <tr><td className="px-3 py-4 text-slate-600" colSpan={8}>No vendors found.</td></tr>
+            <tr><td className="px-3 py-4 text-slate-600" colSpan={8}>No business partners found.</td></tr>
           ) : null}
 
           {vendorItems.map((vendor, index) => (
@@ -268,12 +246,12 @@ export default function VendorsPage() {
                     type="checkbox"
                     checked={list.selectedIds.has(vendor.id)}
                     onChange={() => selection.toggleSelectOne(vendor.id)}
-                    aria-label={`Select vendor ${vendor.name}`}
+                    aria-label={`Select business partner ${vendor.name}`}
                   />
                   <Link
                     href={`/vendors/${vendor.id}`}
                     className="text-slate-500 hover:text-blue-700"
-                    aria-label={`View details for vendor ${vendor.name}`}
+                    aria-label={`View details for business partner ${vendor.name}`}
                   >
                     <Binoculars className="size-4" />
                   </Link>
@@ -288,7 +266,7 @@ export default function VendorsPage() {
               <td className="px-3 py-2"><StatusChip value={vendor.status} /></td>
               <td className="px-3 py-2 text-slate-800">{vendor.sector ?? "-"}</td>
               <td className="max-w-[26rem] truncate px-3 py-2 text-slate-800">{vendor.address ?? "-"}</td>
-              <td className="px-3 py-2 tabular-nums text-slate-800">{vendor.owner_user_id}</td>
+              <td className="px-3 py-2 text-slate-800">{getUserFirstName(vendor.owner_user_id)}</td>
               <td className="px-3 py-2">
                 {vendor.deleted_at ? (
                   <Button variant="secondary" onClick={() => restoreMutation.mutate(vendor.id)}>Restore</Button>

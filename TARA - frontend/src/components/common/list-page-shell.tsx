@@ -14,6 +14,13 @@ interface ListPageShellProps {
   addButtonLabel: string;
   showCreate: boolean;
   onToggleCreate: () => void;
+  createSubmitButton?: {
+    formId: string;
+    label: string;
+    pendingLabel?: string;
+    disabled?: boolean;
+    isPending?: boolean;
+  };
   filters?: React.ReactNode;
   headerActions?: React.ReactNode;
   createForm?: React.ReactNode;
@@ -41,6 +48,7 @@ export function ListPageShell({
   addButtonLabel,
   showCreate,
   onToggleCreate,
+  createSubmitButton,
   filters,
   headerActions,
   createForm,
@@ -79,14 +87,37 @@ export function ListPageShell({
               Include deleted
             </label>
           ) : null}
-          <Button
-            className="text-sm font-medium"
-            type="button"
-            variant="secondary"
-            onClick={onToggleCreate}
-          >
-            {showCreate ? "Close" : addButtonLabel}
-          </Button>
+          {showCreate && createSubmitButton ? (
+            <>
+              <Button
+                className="text-sm font-medium"
+                type="submit"
+                form={createSubmitButton.formId}
+                disabled={createSubmitButton.disabled || createSubmitButton.isPending}
+              >
+                {createSubmitButton.isPending && createSubmitButton.pendingLabel
+                  ? createSubmitButton.pendingLabel
+                  : createSubmitButton.label}
+              </Button>
+              <Button
+                className="text-sm font-medium"
+                type="button"
+                variant="ghost"
+                onClick={onToggleCreate}
+              >
+                Close
+              </Button>
+            </>
+          ) : (
+            <Button
+              className="text-sm font-medium"
+              type="button"
+              variant="secondary"
+              onClick={onToggleCreate}
+            >
+              {showCreate ? "Close" : addButtonLabel}
+            </Button>
+          )}
         </div>
       </div>
 

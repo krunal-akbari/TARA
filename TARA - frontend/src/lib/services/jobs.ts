@@ -32,6 +32,7 @@ export function createJob(payload: {
   description?: string;
   status?: string;
   intake_channel?: string;
+  group_bu?: string;
   origin_client_id?: number | null;
   origin_vendor_id?: number | null;
 }) {
@@ -40,7 +41,7 @@ export function createJob(payload: {
 
 export function updateJob(
   jobId: number | string,
-  payload: { title?: string; description?: string; status?: string; intake_channel?: string },
+  payload: { title?: string; description?: string; status?: string; intake_channel?: string; group_bu?: string },
 ) {
   return apiPatch<Job>(`/api/v1/jobs/${jobId}`, payload);
 }

@@ -17,6 +17,7 @@ import { useMemo } from "react";
 import { ErrorBanner } from "@/components/common/error-banner";
 import { StatusChip } from "@/components/common/status-chip";
 import { Card } from "@/components/ui/card";
+import { useUserNameMap } from "@/hooks/use-user-name-map";
 import { useAuthStore } from "@/lib/auth-store";
 import { queryKeys } from "@/lib/query-keys";
 import { formatId, toTitleCase } from "@/lib/utils/format";
@@ -50,10 +51,6 @@ function initialsFromName(name: string) {
   return name.split(" ").filter(Boolean).slice(0, 2).map((p) => p[0]?.toUpperCase() ?? "").join("") || "NA";
 }
 
-function toRecruiterLabel(ownerUserId: number) {
-  return formatId(ownerUserId, "Recruiter");
-}
-
 const AVATAR_TONES = [
   "bg-emerald-600", "bg-sky-600", "bg-amber-600",
   "bg-rose-600", "bg-violet-600", "bg-teal-600",
@@ -68,13 +65,17 @@ function asRecord(value: unknown): Record<string, unknown> {
   return {};
 }
 
-function toTeamRows(jobs: Job[], metricsByJobId: Map<number, JobMetrics>): TeamRow[] {
+function toTeamRows(
+  jobs: Job[],
+  metricsByJobId: Map<number, JobMetrics>,
+  getUserFirstName: (_userId: number | null | undefined) => string,
+): TeamRow[] {
   const grouped = new Map<number, TeamRow>();
   jobs.forEach((job) => {
     const key = job.owner_user_id;
     const metrics = metricsByJobId.get(job.id);
     if (!grouped.has(key)) {
-      const recruiter = toRecruiterLabel(key);
+      const recruiter = getUserFirstName(key);
       grouped.set(key, {
         recruiter,
         initials: initialsFromName(recruiter),
@@ -177,6 +178,8 @@ export default function DashboardPage() {
   });
 
   const jobs = useMemo(() => jobsQuery.data?.items ?? [], [jobsQuery.data?.items]);
+  const jobOwnerIds = useMemo(() => jobs.map((job) => job.owner_user_id), [jobs]);
+  const { getUserFirstName } = useUserNameMap(jobOwnerIds);
 
   const jobApplicationsQueries = useQueries({
     queries: jobs.map((job) => ({
@@ -210,7 +213,7 @@ export default function DashboardPage() {
     return map;
   }, [jobApplicationsQueries, jobs]);
 
-  const teamRows = toTeamRows(jobs, metricsByJobId);
+  const teamRows = toTeamRows(jobs, metricsByJobId, getUserFirstName);
   const activities = activityQuery.data?.items ?? [];
   const report = reportQuery.data;
 
@@ -238,7 +241,7 @@ export default function DashboardPage() {
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         <StatCard icon={BriefcaseBusiness} label="Total Jobs" value={report?.jobs_total ?? "—"} href="/jobs" color="bg-sky-600" delay={0} />
         <StatCard icon={Building2} label="Clients" value={report?.clients_total ?? "—"} href="/clients" color="bg-blue-600" delay={60} />
-        <StatCard icon={Building2} label="Vendors" value={report?.vendors_total ?? "—"} href="/vendors" color="bg-indigo-600" delay={120} />
+        <StatCard icon={Building2} label="Business Partners" value={report?.vendors_total ?? "—"} href="/vendors" color="bg-indigo-600" delay={120} />
         <StatCard icon={UsersRound} label="Candidates" value={report?.candidates_total ?? "—"} href="/candidates" color="bg-emerald-600" delay={180} />
         <StatCard icon={Handshake} label="Active Links" value={report?.active_links_total ?? "—"} href="/links" color="bg-amber-600" delay={240} />
         <StatCard icon={TrendingUp} label="Transitions" value={report?.route_transitions_total ?? "—"} href="/audit" color="bg-rose-600" delay={300} />
@@ -324,7 +327,7 @@ export default function DashboardPage() {
                       <td className="max-w-52 truncate px-3 py-2">
                         <Link href={`/jobs/${job.id}`} className="font-medium text-blue-700 hover:underline">{job.title}</Link>
                       </td>
-                      <td className="px-3 py-2 text-slate-700">{toRecruiterLabel(job.owner_user_id)}</td>
+                      <td className="px-3 py-2 text-slate-700">{getUserFirstName(job.owner_user_id)}</td>
                       <td className="px-3 py-2 text-center tabular-nums text-slate-900">{m.prospect}</td>
                       <td className="px-3 py-2 text-center tabular-nums text-slate-900">{m.interview}</td>
                       <td className="px-3 py-2 text-center tabular-nums text-slate-900">{m.offerOut}</td>

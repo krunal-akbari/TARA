@@ -1,4 +1,5 @@
 export type SettingsCatalog = {
+  client_category: string[];
   candidate_status: string[];
   candidate_source: string[];
   candidate_employee_type: string[];
@@ -20,6 +21,7 @@ export const SETTINGS_STORAGE_KEY = "tara_settings_catalog_v1";
 export const SETTINGS_UPDATED_EVENT = "tara-settings-updated";
 
 export const DEFAULT_SETTINGS_CATALOG: SettingsCatalog = {
+  client_category: ["finance", "it", "hospitality", "healthcare", "manufacturing", "retail"],
   candidate_status: ["new", "active", "on_hold"],
   candidate_source: ["manual", "referral", "portal", "linkedin"],
   candidate_employee_type: ["full_time", "contract", "part_time"],
@@ -29,6 +31,7 @@ export const DEFAULT_SETTINGS_CATALOG: SettingsCatalog = {
 };
 
 export const DEFAULT_SETTINGS_DEFAULTS: SettingsCatalogDefaults = {
+  client_category: "finance",
   candidate_status: "new",
   candidate_source: "manual",
   candidate_employee_type: "full_time",
@@ -73,6 +76,9 @@ function normalizeDefaultValue(key: SettingsCatalogKey, value: unknown, values: 
 
 export function normalizeCatalog(input: Partial<SettingsCatalog> | null | undefined): SettingsCatalog {
   return {
+    client_category: normalizeValues(
+      input?.client_category?.length ? input.client_category : DEFAULT_SETTINGS_CATALOG.client_category,
+    ),
     candidate_status: normalizeValues(
       input?.candidate_status?.length ? input.candidate_status : DEFAULT_SETTINGS_CATALOG.candidate_status,
     ),
@@ -113,6 +119,7 @@ export function normalizeCatalogState(input: unknown): SettingsCatalogState {
   return {
     catalog,
     defaults: {
+      client_category: normalizeDefaultValue("client_category", rawDefaults?.client_category, catalog.client_category),
       candidate_status: normalizeDefaultValue("candidate_status", rawDefaults?.candidate_status, catalog.candidate_status),
       candidate_source: normalizeDefaultValue("candidate_source", rawDefaults?.candidate_source, catalog.candidate_source),
       candidate_employee_type: normalizeDefaultValue(

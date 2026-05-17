@@ -14,6 +14,8 @@ import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useListPage } from "@/hooks/use-list-page";
+import { useSettingsCatalog } from "@/hooks/use-settings-catalog";
+import { useUserNameMap } from "@/hooks/use-user-name-map";
 import { getApiErrorMessage } from "@/lib/api/http";
 import { useAuthStore } from "@/lib/auth-store";
 import { queryKeys } from "@/lib/query-keys";
@@ -55,7 +57,7 @@ const CLIENT_COLUMN_OPTIONS: Array<{ key: ToggleableClientColumnKey; label: stri
   { key: "partners", label: "Partners" },
   { key: "status", label: "Status" },
   { key: "type", label: "Type" },
-  { key: "ownerUserId", label: "Owner" },
+  { key: "ownerUserId", label: "Recruiter" },
   { key: "deletedAt", label: "Deleted At" },
 ];
 
@@ -79,6 +81,7 @@ export default function ClientsPage() {
   const queryClient = useQueryClient();
   const session = useAuthStore((s) => s.session);
   const list = useListPage();
+  const { catalog, defaults } = useSettingsCatalog();
   const columnMenuRef = useRef<HTMLDivElement>(null);
   const resizeStateRef = useRef<{ key: string; startX: number; startWidth: number; minWidth: number } | null>(null);
 
@@ -105,7 +108,7 @@ export default function ClientsPage() {
   const [clientForm, setClientForm] = useState({
     name: "",
     parent_company: "",
-    category: "",
+    category: defaults.client_category,
     type: "end_client",
     website: "",
     year_founded: "",
@@ -132,6 +135,7 @@ export default function ClientsPage() {
 
   const [error, setError] = useState<string | null>(null);
   const [savingClient, setSavingClient] = useState(false);
+  const clientCategoryOptions = useMemo(() => catalog.client_category, [catalog.client_category]);
 
   const normalizedVendorSearch = vendorSearch.trim();
 
@@ -159,6 +163,8 @@ export default function ClientsPage() {
   const vendorOptions = useMemo(() => vendorsData?.items ?? [], [vendorsData?.items]);
 
   const clientItems = useMemo(() => data?.items ?? [], [data?.items]);
+  const clientOwnerIds = useMemo(() => clientItems.map((client) => client.owner_user_id), [clientItems]);
+  const { getUserFirstName } = useUserNameMap(clientOwnerIds);
 
   const partnerCountQueries = useQueries({
     queries: clientItems.map((client) => ({
@@ -190,6 +196,12 @@ export default function ClientsPage() {
     document.addEventListener("mousedown", onMouseDown);
     return () => document.removeEventListener("mousedown", onMouseDown);
   }, [showColumnMenu]);
+
+  useEffect(() => {
+    if (!clientForm.category && defaults.client_category) {
+      setClientForm((prev) => ({ ...prev, category: defaults.client_category }));
+    }
+  }, [clientForm.category, defaults.client_category]);
 
   useEffect(() => {
     if (!activeResizeKey) return;
@@ -228,7 +240,7 @@ export default function ClientsPage() {
     setClientForm({
       name: "",
       parent_company: "",
-      category: "",
+      category: defaults.client_category,
       type: "end_client",
       website: "",
       year_founded: "",
@@ -425,12 +437,12 @@ export default function ClientsPage() {
     {
       key: "ownerUserId",
       toggleableKey: "ownerUserId",
-      header: "Owner",
+      header: "Recruiter",
       headerClassName: "px-3 py-2 font-medium text-slate-600",
-      cellClassName: "px-3 py-2 tabular-nums text-slate-700",
+      cellClassName: "px-3 py-2 text-slate-700",
       defaultWidth: CLIENT_COLUMN_DIMENSIONS.ownerUserId.defaultWidth,
       minWidth: CLIENT_COLUMN_DIMENSIONS.ownerUserId.minWidth,
-      render: (client) => client.owner_user_id,
+      render: (client) => getUserFirstName(client.owner_user_id),
     },
     {
       key: "deletedAt",
@@ -458,7 +470,7 @@ export default function ClientsPage() {
     if (!clientForm.category.trim()) return setError("Category is required");
     const selectedVendorId = clientForm.type === "vendor" ? Number(clientForm.vendor_id) : null;
     if (clientForm.type === "vendor" && (!selectedVendorId || Number.isNaN(selectedVendorId))) {
-      return setError("Vendor is required when Type is Vendor");
+      return setError("Business Partner is required when Type is Business Partner");
     }
 
     setSavingClient(true);
@@ -505,7 +517,16 @@ export default function ClientsPage() {
           <div className="border-b border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-900">Basic Information</div>
           <div className="grid gap-3 px-3 py-3 sm:grid-cols-2">
             <div><Label htmlFor="client-name">Client Name *</Label><Input id="client-name" className={LINE_INPUT_CLASS} value={clientForm.name} onChange={(e) => setClientForm((p) => ({ ...p, name: e.target.value }))} /></div>
-            <div><Label htmlFor="client-category">Category *</Label><Input id="client-category" className={LINE_INPUT_CLASS} value={clientForm.category} onChange={(e) => setClientForm((p) => ({ ...p, category: e.target.value }))} /></div>
+            <div>
+              <Label htmlFor="client-category">Category *</Label>
+              <Select id="client-category" className={LINE_INPUT_CLASS} value={clientForm.category} onChange={(e) => setClientForm((p) => ({ ...p, category: e.target.value }))}>
+                {clientCategoryOptions.map((option) => (
+                  <option key={option} value={option}>
+                    {toTitleCase(option)}
+                  </option>
+                ))}
+              </Select>
+            </div>
             <div><Label htmlFor="client-website">Website</Label><Input id="client-website" className={LINE_INPUT_CLASS} value={clientForm.website} onChange={(e) => setClientForm((p) => ({ ...p, website: e.target.value }))} /></div>
             <div>
               <Label htmlFor="client-type">Type *</Label>
@@ -520,12 +541,12 @@ export default function ClientsPage() {
                 }}
               >
                 <option value="end_client">End Client</option>
-                <option value="vendor">Vendor</option>
+                <option value="vendor">Business Partner</option>
               </Select>
             </div>
             {clientForm.type === "vendor" ? (
               <div>
-                <Label htmlFor="client-vendor">Vendor *</Label>
+                <Label htmlFor="client-vendor">Business Partner *</Label>
                 <Input
                   id="client-vendor"
                   className={LINE_INPUT_CLASS}
@@ -534,14 +555,14 @@ export default function ClientsPage() {
                     setVendorSearch(e.target.value);
                     setClientForm((p) => ({ ...p, vendor_id: "" }));
                   }}
-                  placeholder="Type vendor name"
+                  placeholder="Type business partner name"
                 />
                 {normalizedVendorSearch.length === 0 ? (
-                  <p className="mt-1 text-xs text-slate-500">Start typing to search vendors.</p>
+                  <p className="mt-1 text-xs text-slate-500">Start typing to search business partners.</p>
                 ) : (
                   <div className="mt-1 max-h-40 overflow-auto rounded border border-slate-200 bg-white">
-                    {vendorsLoading ? <p className="px-3 py-2 text-sm text-slate-500">Searching vendors...</p> : null}
-                    {!vendorsLoading && vendorOptions.length === 0 ? <p className="px-3 py-2 text-sm text-slate-500">No vendors found.</p> : null}
+                    {vendorsLoading ? <p className="px-3 py-2 text-sm text-slate-500">Searching business partners...</p> : null}
+                    {!vendorsLoading && vendorOptions.length === 0 ? <p className="px-3 py-2 text-sm text-slate-500">No business partners found.</p> : null}
                     {!vendorsLoading && vendorOptions.map((vendor) => (
                       <button
                         key={vendor.id}
@@ -557,7 +578,7 @@ export default function ClientsPage() {
                     ))}
                   </div>
                 )}
-                {clientForm.vendor_id ? <p className="mt-1 text-xs text-emerald-700">Selected Vendor ID: {clientForm.vendor_id}</p> : null}
+                {clientForm.vendor_id ? <p className="mt-1 text-xs text-emerald-700">Selected Business Partner ID: {clientForm.vendor_id}</p> : null}
               </div>
             ) : null}
             <div className="sm:col-span-2"><Label htmlFor="client-company-description">Company Description</Label><Textarea id="client-company-description" className="min-h-20 rounded-none border-0 border-b border-slate-300 bg-transparent px-0 shadow-none focus-visible:ring-0" value={clientForm.company_description} onChange={(e) => setClientForm((p) => ({ ...p, company_description: e.target.value }))} /></div>
@@ -606,9 +627,9 @@ export default function ClientsPage() {
         </section>
 
         <section className="overflow-hidden rounded border border-slate-200">
-          <div className="border-b border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-900">Owner</div>
+          <div className="border-b border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-900">Recruiter</div>
           <div className="grid gap-3 px-3 py-3">
-            <div><Label htmlFor="client-owner-full-name">Owner Full Name</Label><Input id="client-owner-full-name" className={LINE_INPUT_CLASS} value={ownerName} readOnly /></div>
+            <div><Label htmlFor="client-owner-full-name">Recruiter Full Name</Label><Input id="client-owner-full-name" className={LINE_INPUT_CLASS} value={ownerName} readOnly /></div>
           </div>
         </section>
 

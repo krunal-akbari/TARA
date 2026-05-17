@@ -14,6 +14,7 @@ class Job(Base, TimestampMixin, SoftDeleteMixin, TenantMixin):
     status: Mapped[str] = mapped_column(String(32), default="draft", nullable=False, index=True)
     priority: Mapped[str] = mapped_column(String(16), default="warm", nullable=False, index=True)
     intake_channel: Mapped[str] = mapped_column(String(32), default="direct_client", nullable=False)
+    group_bu: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
     origin_client_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("clients.id"), nullable=True)
     origin_vendor_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("vendors.id"), nullable=True)
     owner_user_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
