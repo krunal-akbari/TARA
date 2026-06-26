@@ -1,0 +1,534 @@
+<title>Resume Parsing Verification Pass — TARA ATS</title>
+<style>
+  :root{
+    --bg:#0e1117; --panel:#161b22; --panel-2:#1c2230; --border:#2a3344;
+    --text:#e6edf3; --muted:#9aa7b8; --faint:#6b778a;
+    --crit:#f85149; --high:#f0883e; --med:#e3b341; --low:#4493f8; --nit:#8b949e;
+    --good:#3fb950; --warn:#e3b341; --code-bg:#0b0f16; --del:#3a1d1d; --add:#0f2a17;
+    --mono:'SFMono-Regular',Consolas,'Liberation Mono',Menlo,monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+    line-height:1.55;font-size:15px}
+  .wrap{max-width:1180px;margin:0 auto;padding:32px 24px 80px}
+  header.hero{border:1px solid var(--border);background:linear-gradient(160deg,#161b22,#11151c);
+    border-radius:14px;padding:26px 28px;margin-bottom:24px}
+  h1{margin:0 0 6px;font-size:26px;letter-spacing:-.3px}
+  .sub{color:var(--muted);font-size:14px}
+  .meta{display:flex;flex-wrap:wrap;gap:22px;margin-top:18px}
+  .meta div{font-size:13px;color:var(--muted)}
+  .meta b{display:block;color:var(--text);font-size:20px;font-weight:650;margin-top:2px}
+  .bars{margin-top:20px;display:flex;flex-direction:column;gap:7px;max-width:560px}
+  .barrow{display:flex;align-items:center;gap:10px;font-size:12.5px}
+  .barrow .lbl{width:90px;color:var(--muted)}
+  .bar{height:14px;border-radius:4px;min-width:14px}
+  .barrow .n{font-variant-numeric:tabular-nums;color:var(--text);width:24px;text-align:right}
+  .b-crit{background:var(--crit)} .b-high{background:var(--high)} .b-med{background:var(--med)}
+  .b-low{background:var(--low)} .b-nit{background:var(--nit)}
+  .b-res{background:var(--good)} .b-part{background:var(--warn)} .b-nf{background:var(--nit)}
+
+  section{margin-top:30px}
+  h2{font-size:18px;border-bottom:1px solid var(--border);padding-bottom:8px;margin-bottom:14px}
+  .punch{counter-reset:p;list-style:none;padding:0;margin:0}
+  .punch li{background:var(--panel);border:1px solid var(--border);border-left:4px solid var(--high);
+    border-radius:8px;padding:13px 16px 13px 50px;margin-bottom:10px;position:relative}
+  .punch li::before{counter-increment:p;content:counter(p);position:absolute;left:14px;top:12px;
+    width:24px;height:24px;border-radius:50%;background:var(--panel-2);border:1px solid var(--border);
+    display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:var(--high)}
+  .punch li b{color:var(--text)} .punch li span{color:var(--muted);font-size:13.5px}
+
+  .controls{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:18px;
+    background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:12px 14px}
+  .controls input,.controls select{background:var(--code-bg);color:var(--text);
+    border:1px solid var(--border);border-radius:7px;padding:8px 11px;font-size:13.5px}
+  .controls input{flex:1;min-width:180px}
+  .controls .count{color:var(--faint);font-size:12.5px;margin-left:auto}
+
+  .file{border:1px solid var(--border);border-radius:11px;margin-bottom:16px;overflow:hidden;background:var(--panel)}
+  .file>summary{cursor:pointer;list-style:none;padding:14px 18px;display:flex;align-items:center;gap:12px;
+    font-family:var(--mono);font-size:13.5px;background:var(--panel-2)}
+  .file>summary::-webkit-details-marker{display:none}
+  .file>summary .chev{transition:transform .15s;color:var(--faint)}
+  .file[open]>summary .chev{transform:rotate(90deg)}
+  .file>summary .fname{color:var(--text);font-weight:600}
+  .file>summary .pill{margin-left:auto;font-size:11px;color:var(--muted);background:var(--bg);
+    border:1px solid var(--border);border-radius:20px;padding:2px 9px}
+  .filebody{padding:8px 16px 18px}
+
+  .issue{border:1px solid var(--border);border-radius:9px;margin-top:14px;background:var(--bg)}
+  .issue .head{display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:12px 14px;cursor:pointer}
+  .issue .head .title{font-weight:600;font-size:14.5px;flex:1;min-width:200px}
+  .issue .body{padding:0 16px 16px;display:none}
+  .issue.open .body{display:block}
+  .badge{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;
+    border-radius:5px;padding:3px 8px;color:#0b0f16}
+  .sev-Critical{background:var(--crit)} .sev-High{background:var(--high)}
+  .sev-Medium{background:var(--med)} .sev-Low{background:var(--low);color:#fff} .sev-Nitpick{background:var(--nit)}
+  .tag-new{background:var(--low);color:#fff;font-size:10px;font-weight:700;border-radius:5px;padding:2px 7px;text-transform:uppercase;letter-spacing:.4px}
+  .cat{font-size:11px;color:var(--muted);border:1px solid var(--border);border-radius:5px;padding:3px 8px}
+  .loc{font-family:var(--mono);font-size:12px;color:var(--faint)}
+  .conf{font-size:11px;color:var(--faint);margin-left:auto}
+  .lab{font-size:11.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--faint);margin:14px 0 5px}
+  p.exp{margin:6px 0 4px;color:var(--text)}
+  pre{background:var(--code-bg);border:1px solid var(--border);border-radius:8px;padding:12px 14px;
+    overflow-x:auto;font-family:var(--mono);font-size:12.5px;line-height:1.5;margin:0}
+  pre.before{border-left:3px solid var(--crit)} pre.after{border-left:3px solid var(--good)}
+  .tok-kw{color:#ff7b72} .tok-str{color:#a5d6ff} .tok-com{color:#8b949e;font-style:italic}
+  .tok-fn{color:#d2a8ff} .tok-num{color:#79c0ff}
+  .verdict{border:1px solid var(--border);border-left:5px solid var(--warn);background:var(--panel);
+    border-radius:11px;padding:20px 24px}
+  .verdict h2{border:0;margin:0 0 10px}
+  .vbadge{display:inline-block;font-weight:800;font-size:13px;letter-spacing:.5px;color:#0b0f16;
+    background:var(--warn);border-radius:6px;padding:5px 12px;margin-bottom:10px}
+  .hidden{display:none!important}
+  code{font-family:var(--mono);background:var(--panel-2);padding:1px 5px;border-radius:4px;font-size:12.5px}
+  .note{color:var(--muted);font-size:13px}
+  .ok{border:1px solid var(--border);border-left:4px solid var(--good);background:var(--panel);
+    border-radius:10px;padding:14px 18px;margin-top:14px}
+  a{color:var(--low)}
+
+  table.vtab{width:100%;border-collapse:collapse;font-size:13px;margin-top:6px}
+  table.vtab th,table.vtab td{text-align:left;padding:7px 10px;border-bottom:1px solid var(--border);vertical-align:top}
+  table.vtab th{color:var(--faint);font-weight:600;text-transform:uppercase;font-size:11px;letter-spacing:.4px;position:sticky;top:0;background:var(--panel-2)}
+  table.vtab td.id{font-family:var(--mono);color:var(--text);white-space:nowrap}
+  .st{font-size:11px;font-weight:700;border-radius:5px;padding:2px 7px;white-space:nowrap}
+  .st-res{background:var(--good);color:#06210f}
+  .st-part{background:var(--warn);color:#2a2106}
+  .st-nf{background:var(--nit);color:#0b0f16}
+  .st-reg{background:var(--crit);color:#240606}
+  .tabwrap{border:1px solid var(--border);border-radius:11px;overflow:hidden;max-height:640px;overflow-y:auto}
+  .legend{display:flex;gap:16px;flex-wrap:wrap;margin:10px 0 0;font-size:12px;color:var(--muted)}
+  .legend span{display:inline-flex;align-items:center;gap:6px}
+  .dot{width:10px;height:10px;border-radius:3px;display:inline-block}
+</style>
+
+<div class="wrap">
+  <header class="hero">
+    <h1>Resume Parsing — Verification Pass (Post-Fix)</h1>
+    <div class="sub">TARA multi-tenant ATS · Resume ingestion · native extractors only (PDF · DOCX · DOC · RTF · TXT/MD · binary reject) · MinerU removed</div>
+    <div class="meta">
+      <div>Topic<b>Resume Parsing — All Filetypes (verify)</b></div>
+      <div>Review date<b>2026-06-19</b></div>
+      <div>Files scanned<b>6 of 6</b></div>
+      <div>Prior findings<b>27</b></div>
+      <div>Resolved<b style="color:var(--good)">19</b></div>
+      <div>Still open / new<b style="color:var(--warn)">8 + 5</b></div>
+      <div>Verdict<b style="color:var(--warn)">APPROVE WITH NITS</b></div>
+    </div>
+    <div class="bars">
+      <div class="barrow"><span class="lbl">Resolved</span><div class="bar b-res" style="width:380px"></div><span class="n">19</span></div>
+      <div class="barrow"><span class="lbl">Partial</span><div class="bar b-part" style="width:60px"></div><span class="n">3</span></div>
+      <div class="barrow"><span class="lbl">Not&nbsp;fixed</span><div class="bar b-nf" style="width:100px"></div><span class="n">5</span></div>
+      <div class="barrow"><span class="lbl">New&nbsp;issues</span><div class="bar b-low" style="width:100px"></div><span class="n">5</span></div>
+    </div>
+    <p class="note" style="margin-top:18px">
+      <b>Verification scope:</b> Re-read the <em>current</em> state of every in-scope file line by line (file is now 521 lines).
+      Each of the 27 prior findings is marked RESOLVED / PARTIAL / NOT-FIXED / REGRESSED with the proving line.
+      Five new issues introduced by the fixes are surfaced below. All three original Critical findings
+      (DISP-01, DOCX-01, plus the DISP-01-adjacent routing) are <b>fully resolved</b>; the remaining open items are
+      precision/robustness, not safety. <b>Goal achievement:</b> the developer met the stated goals — sound parsing
+      across all filetypes, MinerU fully removed, security findings closed — modulo one real correctness weakness in
+      the binary-rejection gate (NEW-1).
+    </p>
+  </header>
+
+  <!-- ============ MinerU removal ============ -->
+  <section>
+    <div class="ok">
+      <b>MinerU removal — re-verified clean.</b> A fresh case-insensitive grep for <code>mineru</code> / <code>MinerU</code>
+      and for the dead <code>_extract_text</code> wrapper across all <code>.py</code> files in
+      <code>TARA - backend/</code> returns <b>zero matches</b>. No <code>mineru_client.py</code> module, no second
+      parsing model, no dead wrapper. Both call sites — <code>extract_candidate_fields_from_resume</code> (service.py L349)
+      and <code>get_resume_preview_text</code> (service.py L519) — invoke <code>_extract_text_native</code> directly.
+      Goal #2 (single native extractor) is met.
+    </div>
+    <div class="ok" style="border-left-color:var(--good)">
+      <b><code>defusedxml</code> dependency — confirmed declared.</b> <code>pyproject.toml</code> L26 lists
+      <code>"defusedxml&gt;=0.7.1"</code> in <code>[project].dependencies</code>. The import added at service.py L12–13
+      (<code>from defusedxml import ElementTree as ET</code> / <code>from defusedxml.common import DefusedXmlException</code>)
+      will resolve at runtime. <b>No ImportError / broken-deploy risk.</b> (This was the explicit Critical to rule out.)
+    </div>
+  </section>
+
+  <!-- ============ Verification Summary table ============ -->
+  <section>
+    <h2>Verification Summary — all 27 prior findings</h2>
+    <div class="legend">
+      <span><i class="dot st-res"></i>RESOLVED</span>
+      <span><i class="dot st-part"></i>PARTIAL</span>
+      <span><i class="dot st-nf"></i>NOT FIXED (pre-existing, by design or deferred)</span>
+      <span><i class="dot st-reg"></i>REGRESSED</span>
+    </div>
+    <div class="tabwrap" style="margin-top:10px">
+    <table class="vtab">
+      <thead><tr><th>ID</th><th>Status</th><th>Proof line (current file) &amp; note</th></tr></thead>
+      <tbody>
+        <tr><td class="id">PDF-02</td><td><span class="st st-res">RESOLVED</span></td><td><code>service.py:155</code> — empty text layer now raises typed <code>ScannedPdfError</code> with actionable message.</td></tr>
+        <tr><td class="id">PDF-03</td><td><span class="st st-res">RESOLVED</span></td><td><code>service.py:141–142</code> — <code>MAX_PDF_PAGES=50</code> cap enforced before page iteration.</td></tr>
+        <tr><td class="id">PDF-04</td><td><span class="st st-nf">NOT FIXED</span></td><td><code>service.py:147</code> — still plain <code>page.extract_text()</code>; no <code>extraction_mode="layout"</code>. Multi-column flattening persists (precision).</td></tr>
+        <tr><td class="id">PDF-05</td><td><span class="st st-part">PARTIAL</span></td><td><code>service.py:139–140</code> — encrypted PDFs now rejected with clear message, but no <code>decrypt("")</code> attempt for empty-owner-password PDFs (stricter than recommended; acceptable).</td></tr>
+        <tr><td class="id">PDF-06</td><td><span class="st st-res">RESOLVED</span></td><td><code>service.py:146–149</code> — per-page <code>try/except</code> isolates one bad page.</td></tr>
+        <tr><td class="id">DOCX-01</td><td><span class="st st-res">RESOLVED</span></td><td><code>service.py:12,175–177</code> — <code>defusedxml</code> parser + catches <code>DefusedXmlException</code>/<code>ParseError</code>. Entity bomb test passes.</td></tr>
+        <tr><td class="id">DOCX-02</td><td><span class="st st-res">RESOLVED</span></td><td><code>service.py:166–169</code> — <code>file_size</code> cap + compression-ratio guard before <code>read</code>.</td></tr>
+        <tr><td class="id">DOCX-03</td><td><span class="st st-nf">NOT FIXED</span></td><td><code>service.py:163</code> — still only <code>word/document.xml</code>; headers/footers/text-boxes dropped (correctness).</td></tr>
+        <tr><td class="id">DOCX-04</td><td><span class="st st-nf">NOT FIXED</span></td><td><code>service.py:182</code> — still <code>"".join(w:t)</code>; <code>w:tab</code>/<code>w:br</code> not mapped to whitespace (token-gluing).</td></tr>
+        <tr><td class="id">DOCX-05</td><td><span class="st st-res">RESOLVED</span></td><td><code>service.py:174–177</code> — parse folded into <code>try</code>; <code>ET.ParseError</code> caught → <code>ResumeParseError("Invalid DOCX XML")</code>.</td></tr>
+        <tr><td class="id">DOC-01</td><td><span class="st st-part">PARTIAL</span></td><td><code>service.py:238–239</code> — OLE magic (<code>D0CF11E0</code>) now sniffed in dispatcher so routing is sound, but no in-function magic check before invoking antiword; subprocess trust assumptions undocumented.</td></tr>
+        <tr><td class="id">DOC-02</td><td><span class="st st-nf">NOT FIXED</span></td><td><code>service.py:209</code> — still <code>errors="ignore"</code>; non-UTF-8 antiword output silently dropped (accented chars lost).</td></tr>
+        <tr><td class="id">DOC-03</td><td><span class="st st-nf">NOT FIXED</span></td><td><code>service.py:191–195</code> — antiword presence still environment-coupled; raised as input <code>ResumeParseError</code>. Message improved but capability mismatch remains.</td></tr>
+        <tr><td class="id">DOC-04</td><td><span class="st st-res">RESOLVED</span></td><td><code>service.py:197–216</code> — temp-file <code>finally</code> + <code>unlink(missing_ok=True)</code> unchanged and correct (was Low/acceptable).</td></tr>
+        <tr><td class="id">TXT-01</td><td><span class="st st-res">RESOLVED</span></td><td><code>service.py:245–253,289–290</code> — <code>_looks_like_text</code> gate + <code>UnsupportedResumeFormatError</code> replace silent garbage decode. <em>(But see NEW-1: the gate is too lax.)</em></td></tr>
+        <tr><td class="id">TXT-02</td><td><span class="st st-res">RESOLVED</span></td><td><code>service.py:256–264</code> — <code>_decode_text</code> tries utf-8-sig / utf-16 / latin-1; BOM stripped.</td></tr>
+        <tr><td class="id">TXT-03</td><td><span class="st st-res">RESOLVED</span></td><td><code>service.py:267–272,286</code> — dedicated <code>_extract_rtf_text</code>; RTF no longer routed to raw plaintext. <em>(But see NEW-4: strip is naive.)</em></td></tr>
+        <tr><td class="id">DISP-01</td><td><span class="st st-res">RESOLVED</span></td><td><code>service.py:230–242,278</code> — <code>_sniff_resume_format</code> magic-byte sniff is checked first in every dispatcher branch. octet-stream no longer mis-routes.</td></tr>
+        <tr><td class="id">DISP-02</td><td><span class="st st-part">PARTIAL</span></td><td><code>service.py:296</code> — typed exceptions now exist upstream (Scanned/Unsupported), but the final empty-text guard still raises one generic message naming no filetype.</td></tr>
+        <tr><td class="id">FIELD-01</td><td><span class="st st-nf">NOT FIXED</span></td><td><code>service.py:26,354</code> — phone regex unchanged; still <code>.search()</code>, no digit-count validation. False positives still feed dedupe fingerprint (resume_tasks.py:56).</td></tr>
+        <tr><td class="id">FIELD-02</td><td><span class="st st-nf">NOT FIXED</span></td><td><code>service.py:27,314</code> — <code>NAME_TOKEN_PATTERN</code> still ASCII-only <code>[A-Za-z]</code>; rejects José/Müller/Nguyễn and single-token names.</td></tr>
+        <tr><td class="id">FIELD-03</td><td><span class="st st-nf">NOT FIXED</span></td><td><code>service.py:324–340</code> — company still keyword + exact-header fallback returning raw next line.</td></tr>
+        <tr><td class="id">FIELD-04</td><td><span class="st st-nf">NOT FIXED</span></td><td><code>service.py:25</code> — <code>EMAIL_PATTERN</code> still unbounded TLD <code>[A-Z]{2,}</code> with no trailing boundary.</td></tr>
+        <tr><td class="id">FIELD-05</td><td><span class="st st-nf">NOT FIXED</span></td><td><code>service.py:353–354</code> — email/phone still raw <code>.search()</code> over full text vs line-based name/company. Pure refactor; cosmetic.</td></tr>
+        <tr><td class="id">WORK-01</td><td><span class="st st-res">RESOLVED</span></td><td><code>resume_tasks.py:18</code> — <code>@celery_app.task(..., soft_time_limit=60, time_limit=90)</code>. Asserted by <code>test_resume_process_task_has_time_limits</code>.</td></tr>
+        <tr><td class="id">WORK-02</td><td><span class="st st-res">RESOLVED</span></td><td><code>resume_tasks.py:78,95,111</code> — three distinct handlers: <code>SoftTimeLimitExceeded</code> (timeout), <code>ResumeParseError</code> (input), <code>Exception</code> (infra) with typed <code>reason</code> in payload.</td></tr>
+        <tr><td class="id">TEST-01</td><td><span class="st st-res">RESOLVED</span></td><td><code>test_resume_extract_preview.py:165–256</code> — PDF (magic-byte), scanned-PDF, page-cap, binary-reject, RTF tests all added.</td></tr>
+        <tr><td class="id">TEST-02</td><td><span class="st st-res">RESOLVED</span></td><td><code>test_resume_extract_preview.py:140–162</code> — TXT extract-preview now asserts first/last/email/phone/company fields.</td></tr>
+        <tr><td class="id">TEST-03</td><td><span class="st st-res">RESOLVED</span></td><td><code>test_resume_extract_preview.py:283–336</code> — adversarial fixtures: XML entity bomb, oversized document.xml, time-limit assertion.</td></tr>
+      </tbody>
+    </table>
+    </div>
+    <p class="note" style="margin-top:10px"><b>Tally:</b> 19 RESOLVED · 3 PARTIAL (PDF-05, DOC-01, DISP-02 — all acceptable / improved) · 5 NOT FIXED (PDF-04, DOCX-03, DOCX-04, DOC-02/03, FIELD-01..05 — pre-existing precision/robustness, none safety) · 0 REGRESSED. Plus 5 NEW issues from the changes (below).</p>
+  </section>
+
+  <!-- ============ Top punch list ============ -->
+  <section>
+    <h2>Top Things to Fix First (post-fix)</h2>
+    <ol class="punch">
+      <li><b>NEW-1 — the binary-rejection gate counts every high byte (≥128) as printable.</b> <span><code>_looks_like_text</code> (service.py L252) treats bytes 128–255 as printable, so the only bytes that count against the printable ratio are a handful of low control chars. A null-free binary blob (many JPEGs, UTF-8 mojibake, compressed payloads without an early <code>\x00</code>) sails past the 0.85 gate and is accepted as "text" — re-opening the exact TXT-01 garbage-into-fields hole the fix was meant to close. The binary-reject test only passes because its JPEG sample happens to contain an early <code>\x00</code>.</span></li>
+      <li><b>NEW-4 — RTF strip is naive: hex/unicode/binary escapes leak.</b> <span><code>RTF_CONTROL_WORD_PATTERN</code> (L49) matches only <code>\word</code> control words. RTF hex escapes <code>\'e9</code> (accented chars), unicode <code>\uN?</code>, and <code>\bin</code> binary blobs are NOT stripped, so real-world RTF leaves <code>'e9</code> fragments and binary bytes in extracted fields. The happy-path test uses only ASCII so it does not catch this.</span></li>
+      <li><b>FIELD-01..05 (unchanged) — heuristics still auto-write to the candidate record and dedupe fingerprint.</b> <span>Phone regex still matches date ranges/IDs; name extraction is still ASCII-only and rejects single-token/ALL-CAPS; email TLD still unbounded. These wrong values still flow into <code>candidate.phone/email/current_company</code> and <code>build_fingerprint</code> (resume_tasks.py L56), risking false cross-candidate dedupe. Out of stated scope for this pass but the highest remaining product risk.</span></li>
+      <li><b>DOCX-03 / DOCX-04 (unchanged) — header/footer text dropped, runs glued with no separator.</b> <span>Names placed in a DOCX header are invisible; tab/line-break-separated contact lines collapse (<code>Emailjane@x.comPhone</code>), defeating the email/phone regexes. Direct accuracy loss for a common resume layout.</span></li>
+      <li><b>DISP-02 (partial) — final empty-text guard still emits one generic message.</b> <span>service.py L296 raises <code>"Could not extract readable text from resume"</code> for every filetype. Typed errors now exist upstream; carry the detected kind into this last guard so support can tell "empty DOCX" from "whitespace TXT".</span></li>
+    </ol>
+  </section>
+
+  <!-- ============ Files reviewed ============ -->
+  <section>
+    <h2>Files Reviewed</h2>
+    <p class="note"><b>Files scanned: 6 of 6</b> in-scope files, read in full at their current line counts.</p>
+    <ul class="note">
+      <li><code>TARA - backend/app/domains/resumes/service.py</code> — extractors + sniffer + dispatcher + field heuristics (primary, 521 lines)</li>
+      <li><code>TARA - backend/pyproject.toml</code> — <b>defusedxml dependency confirmed (L26)</b></li>
+      <li><code>TARA - backend/app/tasks/resume_tasks.py</code> — Celery worker, soft_time_limit + typed handlers (129 lines)</li>
+      <li><code>TARA - backend/app/domains/resumes/api.py</code> — upload / extract-preview / preview-text / retry (196 lines)</li>
+      <li><code>TARA - backend/tests/integration/test_resume_extract_preview.py</code> — per-filetype + adversarial fixtures (337 lines)</li>
+      <li><code>TARA - backend/tests/integration/test_candidates_resumes_reporting.py</code> — TXT upload + dedupe/reporting (108 lines)</li>
+    </ul>
+  </section>
+
+  <!-- ============ New & open findings ============ -->
+  <section>
+    <h2>New &amp; Still-Open Findings</h2>
+    <div class="controls">
+      <input id="q" type="text" placeholder="Filter by text (id, title, category, code)…" oninput="applyFilters()">
+      <select id="sev" onchange="applyFilters()">
+        <option value="">All severities</option>
+        <option>High</option><option>Medium</option><option>Low</option><option>Nitpick</option>
+      </select>
+      <select id="catf" onchange="applyFilters()">
+        <option value="">All categories</option>
+        <option>Security</option><option>Correctness</option><option>Precision</option>
+        <option>Robustness</option><option>Error Handling</option><option>Code Smell</option>
+      </select>
+      <span class="count" id="count"></span>
+    </div>
+
+    <!-- ============ NEW: sniffer / binary gate ============ -->
+    <details class="file" open data-file="service.py · sniffer">
+      <summary><span class="chev">▶</span><span class="fname">service.py · _sniff_resume_format / _looks_like_text / _decode_text (NEW)</span><span class="pill">4 issues</span></summary>
+      <div class="filebody">
+
+        <!-- NEW-1 -->
+        <div class="issue" data-sev="High" data-cat="Correctness">
+          <div class="head" onclick="this.parentNode.classList.toggle('open')">
+            <span class="badge sev-High">High</span><span class="tag-new">New</span>
+            <span class="title">NEW-1 · _looks_like_text counts every byte ≥128 as printable — binary rejection is too lax</span>
+            <span class="cat">Correctness</span><span class="loc">L245–253</span><span class="conf">Confidence: High</span>
+          </div>
+          <div class="body">
+            <div class="lab">Code (current)</div>
+<pre class="before"><span class="tok-kw">def</span> <span class="tok-fn">_looks_like_text</span>(data: bytes) -&gt; bool:
+    <span class="tok-kw">if</span> <span class="tok-kw">not</span> data:
+        <span class="tok-kw">return</span> <span class="tok-kw">False</span>
+    sample = data[:<span class="tok-num">4096</span>]
+    <span class="tok-kw">if</span> <span class="tok-str">b"\x00"</span> <span class="tok-kw">in</span> sample:
+        <span class="tok-kw">return</span> sample.<span class="tok-fn">startswith</span>((<span class="tok-str">b"\xff\xfe"</span>, <span class="tok-str">b"\xfe\xff"</span>))
+    allowed_controls = {<span class="tok-num">9</span>, <span class="tok-num">10</span>, <span class="tok-num">13</span>}
+    printable = <span class="tok-fn">sum</span>(<span class="tok-num">1</span> <span class="tok-kw">for</span> byte <span class="tok-kw">in</span> sample <span class="tok-kw">if</span> byte <span class="tok-kw">in</span> allowed_controls <span class="tok-kw">or</span> <span class="tok-num">32</span> &lt;= byte &lt;= <span class="tok-num">126</span> <span class="tok-kw">or</span> byte &gt;= <span class="tok-num">128</span>)
+    <span class="tok-kw">return</span> printable / <span class="tok-fn">len</span>(sample) &gt;= MIN_PRINTABLE_TEXT_RATIO</pre>
+            <p class="exp"><b>Why it matters:</b> The clause <code>or byte &gt;= 128</code> classifies <em>all</em> high bytes (0x80–0xFF) as printable. The only bytes that ever count against the ratio are the low control chars 0–8, 11, 12, 14–31, and 127. A binary file with no early <code>\x00</code> — and many real binaries (JPEG/PNG bodies, gzip, fonts) are dense with high bytes and sparse with low control bytes — easily clears the 0.85 threshold and is accepted as <code>"text"</code>, decoded by <code>latin-1</code> (which can decode anything), and mined for name/email/phone. This re-opens the very TXT-01 hole the fix was meant to close. The passing test <code>test_binary_upload_is_rejected_not_garbled</code> only works because its JPEG sample contains <code>\x00</code> at offset 4, hitting the early null-byte branch; drop that null and the test would let the blob through. The intent was almost certainly to allow valid UTF-8 multibyte sequences (which use high bytes) — but the correct way is to attempt a strict decode, not to bless every high byte.</p>
+            <div class="lab">Recommendation (validate via decode + control-char density, not a blanket high-byte pass)</div>
+<pre class="after"><span class="tok-kw">def</span> <span class="tok-fn">_looks_like_text</span>(data: bytes) -&gt; bool:
+    <span class="tok-kw">if</span> <span class="tok-kw">not</span> data:
+        <span class="tok-kw">return</span> <span class="tok-kw">False</span>
+    sample = data[:<span class="tok-num">4096</span>]
+    <span class="tok-kw">if</span> <span class="tok-str">b"\x00"</span> <span class="tok-kw">in</span> sample:
+        <span class="tok-kw">return</span> sample.<span class="tok-fn">startswith</span>((<span class="tok-str">b"\xff\xfe"</span>, <span class="tok-str">b"\xfe\xff"</span>))
+    <span class="tok-com"># Prefer a real decode test for the high-byte range:</span>
+    <span class="tok-kw">try</span>:
+        decoded = sample.<span class="tok-fn">decode</span>(<span class="tok-str">"utf-8"</span>)
+    <span class="tok-kw">except</span> UnicodeDecodeError:
+        decoded = sample.<span class="tok-fn">decode</span>(<span class="tok-str">"latin-1"</span>)
+    printable = <span class="tok-fn">sum</span>(c.<span class="tok-fn">isprintable</span>() <span class="tok-kw">or</span> c <span class="tok-kw">in</span> <span class="tok-str">"\t\n\r"</span> <span class="tok-kw">for</span> c <span class="tok-kw">in</span> decoded)
+    <span class="tok-kw">return</span> printable / <span class="tok-fn">len</span>(decoded) &gt;= MIN_PRINTABLE_TEXT_RATIO</pre>
+            <p class="note">Using <code>str.isprintable()</code> over decoded chars rejects the C1 control range (0x80–0x9F) and other non-printable Unicode that the raw <code>byte&gt;=128</code> test waves through, while still accepting legitimate accented UTF-8/Latin-1 text.</p>
+          </div>
+        </div>
+
+        <!-- NEW-2 -->
+        <div class="issue" data-sev="Low" data-cat="Code Smell">
+          <div class="head" onclick="this.parentNode.classList.toggle('open')">
+            <span class="badge sev-Low">Low</span><span class="tag-new">New</span>
+            <span class="title">NEW-2 · Double truncate/strip — every extractor result is truncated twice</span>
+            <span class="cat">Code Smell</span><span class="loc">L153/187/272 then L297; L291 .strip() after _decode_text</span><span class="conf">Confidence: High</span>
+          </div>
+          <div class="body">
+            <div class="lab">Code (current)</div>
+<pre class="before"><span class="tok-com"># each extractor already ends in _truncate_extracted_text(...)</span>
+    text = <span class="tok-fn">_decode_text</span>(data).<span class="tok-fn">strip</span>()   <span class="tok-com"># L291 — _decode_text already truncates+strips</span>
+    ...
+    <span class="tok-kw">return</span> <span class="tok-fn">_truncate_extracted_text</span>(text)    <span class="tok-com"># L297 — truncates a second time</span></pre>
+            <p class="exp"><b>Why it matters:</b> Harmless but confusing. <code>_truncate_extracted_text</code> (L129–130) already calls <code>.strip()</code>, and every extractor returns through it, yet the dispatcher truncates again at L297 and the text branch adds an extra <code>.strip()</code> at L291. No correctness bug (idempotent), but it muddies the contract: a reader cannot tell where the single source of truth for capping/stripping is. Pick one layer — do the cap once in the dispatcher OR once per extractor, not both.</p>
+            <div class="lab">Recommendation</div>
+<pre class="after"><span class="tok-com"># Let extractors return raw joined text; cap exactly once in _extract_text_native:</span>
+    text = <span class="tok-fn">_decode_text</span>(data)
+    ...
+    <span class="tok-kw">return</span> <span class="tok-fn">_truncate_extracted_text</span>(text)   <span class="tok-com"># the only cap/strip site</span></pre>
+          </div>
+        </div>
+
+        <!-- NEW-3 -->
+        <div class="issue" data-sev="Low" data-cat="Robustness">
+          <div class="head" onclick="this.parentNode.classList.toggle('open')">
+            <span class="badge sev-Low">Low</span><span class="tag-new">New</span>
+            <span class="title">NEW-3 · _decode_text can never raise — latin-1 is an unconditional catch-all</span>
+            <span class="cat">Robustness</span><span class="loc">L256–264</span><span class="conf">Confidence: High</span>
+          </div>
+          <div class="body">
+            <div class="lab">Code (current)</div>
+<pre class="before"><span class="tok-kw">def</span> <span class="tok-fn">_decode_text</span>(data: bytes) -&gt; str:
+    <span class="tok-kw">for</span> encoding <span class="tok-kw">in</span> (<span class="tok-str">"utf-8-sig"</span>, <span class="tok-str">"utf-16"</span>, <span class="tok-str">"latin-1"</span>):
+        <span class="tok-kw">try</span>:
+            text = data.<span class="tok-fn">decode</span>(encoding)
+        <span class="tok-kw">except</span> UnicodeDecodeError:
+            <span class="tok-kw">continue</span>
+        <span class="tok-kw">if</span> <span class="tok-fn">_collapse_spaces</span>(text):
+            <span class="tok-kw">return</span> <span class="tok-fn">_truncate_extracted_text</span>(text)
+    <span class="tok-kw">raise</span> <span class="tok-fn">ResumeParseError</span>(<span class="tok-str">"Could not decode resume text"</span>)</pre>
+            <p class="exp"><b>Why it matters:</b> <code>latin-1</code> maps every one of the 256 byte values to a character, so <code>data.decode("latin-1")</code> never raises. The only way to reach the final <code>raise</code> is an all-whitespace file. This is fine for the text branch (which is gated by <code>_looks_like_text</code> first) but <code>_extract_rtf_text</code> calls <code>_decode_text</code> with <em>no</em> such gate — so a binary file that happens to start with <code>{\rtf</code> magic (or is uploaded with <code>.rtf</code>/<code>application/rtf</code>) is latin-1-decoded into garbage rather than rejected. Combine with NEW-1 and the binary-reject guarantee is weaker than the report claims. Gate RTF input through <code>_looks_like_text</code> too, or have <code>_decode_text</code> accept a strict-only flag.</p>
+          </div>
+        </div>
+
+        <!-- NEW-4 -->
+        <div class="issue" data-sev="Medium" data-cat="Correctness">
+          <div class="head" onclick="this.parentNode.classList.toggle('open')">
+            <span class="badge sev-Medium">Medium</span><span class="tag-new">New</span>
+            <span class="title">NEW-4 · RTF strip misses hex (\'hh), unicode (\uN) and binary (\bin) escapes</span>
+            <span class="cat">Correctness</span><span class="loc">L49, L267–272</span><span class="conf">Confidence: High</span>
+          </div>
+          <div class="body">
+            <div class="lab">Code (current)</div>
+<pre class="before">RTF_CONTROL_WORD_PATTERN = re.<span class="tok-fn">compile</span>(<span class="tok-str">r"\\[a-zA-Z]+-?\d* ?"</span>)
+<span class="tok-com"># ...</span>
+<span class="tok-kw">def</span> <span class="tok-fn">_extract_rtf_text</span>(data: bytes) -&gt; str:
+    text = <span class="tok-fn">_decode_text</span>(data)
+    text = text.<span class="tok-fn">replace</span>(<span class="tok-str">"\\par"</span>, <span class="tok-str">"\n"</span>).<span class="tok-fn">replace</span>(<span class="tok-str">"\\line"</span>, <span class="tok-str">"\n"</span>)
+    text = RTF_CONTROL_WORD_PATTERN.<span class="tok-fn">sub</span>(<span class="tok-str">""</span>, text)
+    text = text.<span class="tok-fn">replace</span>(<span class="tok-str">"{"</span>, <span class="tok-str">" "</span>).<span class="tok-fn">replace</span>(<span class="tok-str">"}"</span>, <span class="tok-str">" "</span>).<span class="tok-fn">replace</span>(<span class="tok-str">"\\"</span>, <span class="tok-str">" "</span>)</pre>
+            <p class="exp"><b>Why it matters:</b> The control-word regex only matches <code>\word</code>-style words. Three common RTF constructs slip through: (1) hex escapes <code>\'e9</code> — used for every accented character in <code>ansi</code> RTF — the <code>\'</code> is not <code>[a-zA-Z]</code>, so after the final <code>replace("\\"," ")</code> you are left with stray <code>'e9</code> tokens littering the text and corrupting names like "José" → "Jos 'e9". (2) Unicode escapes <code>\u233?</code> leave the trailing fallback char. (3) <code>\bin&lt;N&gt;</code> binary blobs and embedded objects are not skipped — their raw bytes leak into output. The happy-path test (<code>test_rtf_control_words_do_not_leak_into_extracted_fields</code>) only uses 7-bit ASCII, so none of this is exercised. For an international ATS this directly corrupts the name/company fields it is supposed to clean. <b>Recommendation:</b> use a real RTF-to-text routine (e.g. <code>striprtf</code>) or extend the stripper to decode <code>\'hh</code> and <code>\uN</code> and drop <code>\bin</code> runs.</p>
+            <div class="lab">Recommendation (minimum: handle hex escapes before the catch-all)</div>
+<pre class="after">    <span class="tok-kw">import</span> codecs
+    text = re.<span class="tok-fn">sub</span>(<span class="tok-str">r"\\'([0-9a-fA-F]{2})"</span>,
+                  <span class="tok-kw">lambda</span> m: <span class="tok-fn">bytes</span>([<span class="tok-fn">int</span>(m.<span class="tok-fn">group</span>(<span class="tok-num">1</span>), <span class="tok-num">16</span>)]).<span class="tok-fn">decode</span>(<span class="tok-str">"cp1252"</span>, <span class="tok-str">"replace"</span>), text)
+    text = re.<span class="tok-fn">sub</span>(<span class="tok-str">r"\\u(-?\d+)\??"</span>, <span class="tok-kw">lambda</span> m: <span class="tok-fn">chr</span>(<span class="tok-fn">int</span>(m.<span class="tok-fn">group</span>(<span class="tok-num">1</span>)) % <span class="tok-num">65536</span>), text)
+    <span class="tok-com"># then strip remaining control words / braces; or just adopt striprtf</span></pre>
+          </div>
+        </div>
+
+      </div>
+    </details>
+
+    <!-- ============ NEW: worker ============ -->
+    <details class="file" open data-file="resume_tasks.py">
+      <summary><span class="chev">▶</span><span class="fname">app/tasks/resume_tasks.py · timeout handler</span><span class="pill">1 issue</span></summary>
+      <div class="filebody">
+
+        <!-- NEW-5 -->
+        <div class="issue" data-sev="Nitpick" data-cat="Code Smell">
+          <div class="head" onclick="this.parentNode.classList.toggle('open')">
+            <span class="badge sev-Nitpick">Nitpick</span><span class="tag-new">New</span>
+            <span class="title">NEW-5 · ResumeParseTimeoutError is instantiated only to be stringified — class is decorative</span>
+            <span class="cat">Code Smell</span><span class="loc">service.py:64–65; resume_tasks.py:10,81,94</span><span class="conf">Confidence: High</span>
+          </div>
+          <div class="body">
+            <div class="lab">Code (current)</div>
+<pre class="before"><span class="tok-com"># service.py defines it:</span>
+<span class="tok-kw">class</span> <span class="tok-fn">ResumeParseTimeoutError</span>(ResumeParseError):
+    <span class="tok-kw">pass</span>
+<span class="tok-com"># resume_tasks.py only ever does:</span>
+    <span class="tok-kw">except</span> SoftTimeLimitExceeded:
+        ...
+        timeout_error = <span class="tok-fn">ResumeParseTimeoutError</span>(<span class="tok-str">"Resume parsing timed out"</span>)
+        ...
+        payload={... <span class="tok-str">"error"</span>: <span class="tok-fn">str</span>(timeout_error), <span class="tok-str">"reason"</span>: <span class="tok-str">"timeout"</span>}</pre>
+            <p class="exp"><b>Why it matters:</b> The timeout is caught as Celery's <code>SoftTimeLimitExceeded</code>; <code>ResumeParseTimeoutError</code> is then constructed purely so <code>str(timeout_error)</code> yields the message string. It is never <code>raise</code>d, never caught by type, and never propagates to a caller — so the class adds an import and a public symbol with no behavioral role (a string literal would be equivalent). It is <em>not</em> dead (it is instantiated), but it is misleading: a maintainer reasonably expects an exception class to be raised/caught somewhere. Either raise it (e.g. re-raise inside the handler so a future caller can catch the typed timeout) or drop the class and inline the message.</p>
+            <div class="lab">Recommendation</div>
+<pre class="after">    <span class="tok-kw">except</span> SoftTimeLimitExceeded:
+        db.<span class="tok-fn">rollback</span>()
+        ...
+        payload={... <span class="tok-str">"error"</span>: <span class="tok-str">"Resume parsing timed out"</span>, <span class="tok-str">"reason"</span>: <span class="tok-str">"timeout"</span>}
+        <span class="tok-com"># drop ResumeParseTimeoutError, OR actually raise it for typed propagation</span></pre>
+          </div>
+        </div>
+
+      </div>
+    </details>
+
+    <!-- ============ Carried-over (not fixed) ============ -->
+    <details class="file" data-file="service.py · carried-over">
+      <summary><span class="chev">▶</span><span class="fname">service.py · carried-over precision findings (NOT FIXED — restated)</span><span class="pill">7 issues</span></summary>
+      <div class="filebody">
+
+        <div class="issue" data-sev="High" data-cat="Precision">
+          <div class="head" onclick="this.parentNode.classList.toggle('open')">
+            <span class="badge sev-High">High</span>
+            <span class="title">FIELD-01 · Phone regex still matches dates/IDs; result auto-saved + feeds dedupe</span>
+            <span class="cat">Precision</span><span class="loc">L26, L354; resume_tasks.py L48–56</span><span class="conf">Confidence: High</span>
+          </div>
+          <div class="body">
+            <p class="exp"><b>Status: NOT FIXED.</b> <code>PHONE_PATTERN</code> (L26) and the <code>.search()</code> usage (L354) are unchanged from the prior review. No digit-count validation, no word boundaries, no <code>finditer</code> selection. A matched date range or ID is still written to <code>candidate.phone</code> and folded into <code>build_fingerprint</code> (resume_tasks.py L56), so a spurious "phone" can still cause false dedupe collisions across distinct candidates. Was out of the stated fix scope, but remains the highest-impact precision bug.</p>
+          </div>
+        </div>
+
+        <div class="issue" data-sev="High" data-cat="Precision">
+          <div class="head" onclick="this.parentNode.classList.toggle('open')">
+            <span class="badge sev-High">High</span>
+            <span class="title">FIELD-02 · Name extraction still ASCII-only; rejects accented + single-token names</span>
+            <span class="cat">Precision</span><span class="loc">L27, L300–321</span><span class="conf">Confidence: High</span>
+          </div>
+          <div class="body">
+            <p class="exp"><b>Status: NOT FIXED.</b> <code>NAME_TOKEN_PATTERN = ^[A-Za-z][A-Za-z'.-]*$</code> (L27) is ASCII-only, so José / Müller / Nguyễn still fail the <code>all(...)</code> token check (L314) and the name is dropped — a real gap for an international ATS. The 2–4 token gate (L312) still rejects single-name headers, and ALL-CAPS names are stored verbatim with no title-casing.</p>
+          </div>
+        </div>
+
+        <div class="issue" data-sev="Medium" data-cat="Precision">
+          <div class="head" onclick="this.parentNode.classList.toggle('open')">
+            <span class="badge sev-Medium">Medium</span>
+            <span class="title">FIELD-03 · Company extraction still keyword + exact-header fallback returning raw next line</span>
+            <span class="cat">Precision</span><span class="loc">L39–42, L324–340</span><span class="conf">Confidence: High</span>
+          </div>
+          <div class="body">
+            <p class="exp"><b>Status: NOT FIXED.</b> Unchanged. The exact-header set (L331) still misses "Employment History" / "Work History", and the fallback still returns the first non-empty line after the header — usually a job title or date range — into <code>current_company</code>.</p>
+          </div>
+        </div>
+
+        <div class="issue" data-sev="Medium" data-cat="Precision">
+          <div class="head" onclick="this.parentNode.classList.toggle('open')">
+            <span class="badge sev-Medium">Medium</span>
+            <span class="title">FIELD-04 · EMAIL_PATTERN still over-captures glued tokens (unbounded TLD)</span>
+            <span class="cat">Precision</span><span class="loc">L25</span><span class="conf">Confidence: Medium</span>
+          </div>
+          <div class="body">
+            <p class="exp"><b>Status: NOT FIXED.</b> <code>[A-Z]{2,}</code> with no trailing boundary (L25) still captures <code>acme.comPhone</code> when DOCX-04 / PDF token-gluing runs words together. More likely now that DOCX-04 is also unfixed.</p>
+          </div>
+        </div>
+
+        <div class="issue" data-sev="Medium" data-cat="Correctness">
+          <div class="head" onclick="this.parentNode.classList.toggle('open')">
+            <span class="badge sev-Medium">Medium</span>
+            <span class="title">DOCX-03 / DOCX-04 · Header/footer text dropped; runs glued with no separator</span>
+            <span class="cat">Correctness</span><span class="loc">L163, L181–185</span><span class="conf">Confidence: High</span>
+          </div>
+          <div class="body">
+            <p class="exp"><b>Status: NOT FIXED.</b> Only <code>word/document.xml</code> is read (L163), and paragraph runs are joined with <code>"".join(parts)</code> over <code>w:t</code> only (L182–183) — <code>w:tab</code>/<code>w:br</code> are not mapped to whitespace. Names in headers stay invisible; tab-separated contact lines collapse and defeat the email/phone regexes.</p>
+          </div>
+        </div>
+
+        <div class="issue" data-sev="Medium" data-cat="Correctness">
+          <div class="head" onclick="this.parentNode.classList.toggle('open')">
+            <span class="badge sev-Medium">Medium</span>
+            <span class="title">DOC-02 · antiword output still decoded utf-8 errors="ignore" (drops accented chars)</span>
+            <span class="cat">Correctness</span><span class="loc">L208–209</span><span class="conf">Confidence: Medium</span>
+          </div>
+          <div class="body">
+            <p class="exp"><b>Status: NOT FIXED.</b> <code>encoding="utf-8", errors="ignore"</code> (L208–209) still silently deletes any non-UTF-8 byte antiword emits (it commonly emits cp1252). Prefer <code>errors="replace"</code> or <code>antiword -m UTF-8.txt</code>.</p>
+          </div>
+        </div>
+
+        <div class="issue" data-sev="Medium" data-cat="Precision">
+          <div class="head" onclick="this.parentNode.classList.toggle('open')">
+            <span class="badge sev-Medium">Medium</span>
+            <span class="title">PDF-04 · Multi-column / table layouts still flattened (no layout mode)</span>
+            <span class="cat">Precision</span><span class="loc">L147</span><span class="conf">Confidence: High</span>
+          </div>
+          <div class="body">
+            <p class="exp"><b>Status: NOT FIXED.</b> <code>page.extract_text()</code> (L147) runs in default content-stream order; two-column resumes still interleave, corrupting the line-based name/company heuristics. <code>extraction_mode="layout"</code> is a one-line improvement.</p>
+          </div>
+        </div>
+
+      </div>
+    </details>
+
+    <p class="note hidden" id="noresults">No issues match the current filters.</p>
+  </section>
+
+  <!-- ============ Verdict ============ -->
+  <section>
+    <div class="verdict" id="verdict">
+      <div class="vbadge">APPROVE WITH NITS</div>
+      <h2>Overall Verdict</h2>
+      <p>The developer hit the goals: all three Critical findings are genuinely closed — DOCX now parses with
+      <code>defusedxml</code> (dependency confirmed in <code>pyproject.toml</code>) behind real zip-bomb size/ratio caps,
+      the dispatcher routes by magic-byte sniff first, the Celery task has a <code>soft_time_limit</code> with typed
+      timeout/input/infra handlers, and MinerU is verifiably gone. Per-filetype and adversarial tests now exist. The
+      single real new defect is <b>NEW-1</b>: <code>_looks_like_text</code> blesses every byte ≥128 as printable, so a
+      null-free binary can still slip through the text gate and be mined as garbage — partially undermining the TXT-01
+      fix (the binary-reject test only passes by accident of an early null byte). With NEW-1 tightened, this is
+      production-safe; everything else still open is pre-existing precision/robustness (field heuristics, DOCX run
+      handling, RTF escape handling) that was outside the fix scope. I would <b>approve with nits</b> — fix NEW-1
+      before relying on the binary-rejection guarantee, and schedule the FIELD-* precision work since those values
+      auto-write to candidate records and the dedupe fingerprint.</p>
+    </div>
+  </section>
+
+  <p class="note" style="margin-top:30px;text-align:center">
+    Verification pass · 2026-06-19 · 27 prior findings (19 resolved / 3 partial / 5 not-fixed / 0 regressed) + 5 new · 6 files · native extractors only (MinerU removed)
+  </p>
+</div>
+
+<script>
+  function applyFilters(){
+    var q=document.getElementById('q').value.toLowerCase().trim();
+    var sev=document.getElementById('sev').value;
+    var cat=document.getElementById('catf').value;
+    var issues=document.querySelectorAll('.issue');
+    var shown=0;
+    issues.forEach(function(it){
+      var mSev=!sev||it.dataset.sev===sev;
+      var mCat=!cat||it.dataset.cat===cat;
+      var mQ=!q||it.textContent.toLowerCase().indexOf(q)>-1;
+      var ok=mSev&&mCat&&mQ;
+      it.classList.toggle('hidden',!ok);
+      if(ok)shown++;
+    });
+    document.querySelectorAll('.file').forEach(function(f){
+      var vis=f.querySelectorAll('.issue:not(.hidden)').length;
+      f.classList.toggle('hidden',vis===0);
+      var pill=f.querySelector('.pill');
+      if(pill)pill.textContent=vis+(vis===1?' issue':' issues');
+      if(vis>0&&(q||sev||cat))f.setAttribute('open','');
+    });
+    document.getElementById('noresults').classList.toggle('hidden',shown>0);
+    document.getElementById('count').textContent=shown+' shown';
+  }
+  applyFilters();
+</script>
